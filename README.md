@@ -2,6 +2,10 @@
 
 A UI library with warts! ToadUI is a helper UI library built on top of the basic UI provided by OpenCV. As such, it inherits much of the UI limitations of OpenCV. The goal is to provide ready-to-use UI elements that are not already part of OpenCV (e.g. buttons).
 
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/285c9cfa-1a4e-4347-bb1f-1b8bf4a1a242">
+</p>
+
 This library is still in early development.
 
 
@@ -22,7 +26,7 @@ ToadUI is intended for quick prototyping and is geared towards handling video (o
 
 This library is not meant for making professional or consumer-facing UIs. It's also poorly suited to anything requiring text input from users, at least for now. It's mainly recommended for those who are already using OpenCV.
 
-If you're looking to make a UI for a product, this library probably isn't suitable!
+If you're looking to make a UI for a _product_, this library probably isn't suitable!
 
 
 ## Usage
@@ -31,7 +35,10 @@ ToadUI uses a hybrid system that blends concepts from both [retained mode](https
 
 ### Install
 
-ToadUI is still in early development and is therefore not recommended for use in any serious projects. However, it can be installed using pip or uv if you would like to experiement with it.
+ToadUI is still in early development and is therefore not recommended for use in any serious projects. However, it can be installed using pip or uv if you would like to experiment with it. It can be installed into an existing project using Github:
+
+<details>
+<summary>Using pip</summary>
 
 ### Install using pip:
 
@@ -49,31 +56,58 @@ And then install in [editable mode](https://pip.pypa.io/en/stable/topics/local-p
 ```bash
 pip install -e .
 ```
+</details>
+
+<details>
+<summary>Using uv</summary>
 
 ### Install using uv:
 
-Alternatively, if you prefer to use something like [uv](https://docs.astral.sh/uv/) to install the project, then after cloning the repo you can simply run something like:
+If you prefer to use something like [uv](https://docs.astral.sh/uv/) to install the project, then after cloning the repo you can simply run something like:
 ```bash
 uv run demos/game_of_life.py
 ```
 Which will install the project and run one of the included demos.
+
+</details>
+
+
+<details>
+<summary>Install from Github</summary>
+
+### Installing from github:
+
+This repo can be installed into an existing project by using github:
+
+#### Using pip:
+```bash
+# Be sure to activate a virtual environment before installing!
+pip install git+https://github.com/heyoeyo/toadui
+```
+
+#### Using UV:
+```bash
+uv venv && uv pip install git+https://github.com/heyoeyo/toadui
+```
+</details>
+
 
 ### Simple Example
 
 The following example creates a UI for a simple video player:
 
 ```python
-from toadui import DisplayWindow, DynamicImage, VStack, LoopingVideoReader, VideoPlaybackSlider
+import toadui as tui
 
-vreader = LoopingVideoReader("/path/to/video.mp4")
+vreader = tui.LoopingVideoReader("/path/to/video.mp4")
 
 # Define UI elements
-img_elem = DynamicImage()
-playback_slider = VideoPlaybackSlider(vreader)
-ui_layout = VStack(img_elem, playback_slider)
+img_elem = tui.DynamicImage()
+playback_slider = tui.VideoPlaybackSlider(vreader)
+ui_layout = tui.VStack(img_elem, playback_slider)
 
 # Set up display window and attach UI for mouse interactions
-window = DisplayWindow(display_fps=vreader.get_framerate())
+window = tui.DisplayWindow(display_fps=vreader.get_framerate())
 window.attach_mouse_callbacks(ui_layout)
 window.attach_keypress_callback(" ", vreader.toggle_pause)
 
@@ -92,3 +126,9 @@ while True:
 vreader.release()
 window.close()
 ```
+
+The result is a simple video player with playback control, it can be paused/unpaused by pressing the spacebar or the included button next to the playback slider.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/33ab98ba-71a6-43fb-b247-e66e33b37baa">
+</p>
