@@ -1,17 +1,18 @@
 # ToadUI
 
-A UI library with warts! ToadUI is a helper UI library built on top of the basic UI provided by OpenCV. As such, it inherits much of the UI limitations of OpenCV. The goal is to provide ready-to-use UI elements that are not already part of OpenCV (e.g. buttons).
+ToadUI is a helper UI library built on top of the basic UI provided by [OpenCV](https://opencv.org/). As such, it inherits much of the UI limitations of OpenCV. The goal is to provide ready-to-use UI elements that are not already part of OpenCV (e.g. buttons).
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/285c9cfa-1a4e-4347-bb1f-1b8bf4a1a242">
 </p>
 
-This library is still in early development.
+> [!IMPORTANT]
+> This library is still in early development
 
 
 ## Who is this for?
 
-ToadUI is intended for quick prototyping and is geared towards handling video (or video-like) visualizations. For example, earlier versions of the library have been used to interactively visualize the internal state of vision transformer models (see experiments from [MuggledDPT](https://github.com/heyoeyo/muggled_dpt/tree/main/experiments) and [MuggledSAM](https://github.com/heyoeyo/muggled_sam/tree/main/experiments)).
+This library is intended for prototyping and is geared towards handling video (or video-like) visualizations. For example, earlier versions of the library have been used to interactively visualize the internal state of vision transformer models (see experiments from [MuggledDPT](https://github.com/heyoeyo/muggled_dpt/tree/main/experiments) and [MuggledSAM](https://github.com/heyoeyo/muggled_sam/tree/main/experiments)).
 
 
 ### Basic features
@@ -29,11 +30,7 @@ This library is not meant for making professional or consumer-facing UIs. It's a
 If you're looking to make a UI for a _product_, this library probably isn't suitable!
 
 
-## Usage
-
-ToadUI uses a hybrid system that blends concepts from both [retained mode](https://en.wikipedia.org/wiki/Retained_mode) and [immediate mode](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) design. As a user of the library, this means you define the structure and layout of your UI elements ahead of time (a bit like HTML), but interactions and rendering are handled in a synchronous, on-demand way. This isn't particularly efficient, but lends itself to code that's easy to write.
-
-### Install
+## Installation
 
 ToadUI is still in early development and is therefore not recommended for use in any serious projects. However, it can be installed using pip or uv if you would like to experiment with it. It can be installed into an existing project using Github:
 
@@ -91,6 +88,9 @@ uv venv && uv pip install git+https://github.com/heyoeyo/toadui
 ```
 </details>
 
+## Usage
+
+ToadUI uses a hybrid system that blends concepts from both [retained mode](https://en.wikipedia.org/wiki/Retained_mode) and [immediate mode](https://en.wikipedia.org/wiki/Immediate_mode_(computer_graphics)) design. As a user of the library, this means you define the structure and layout of your UI elements ahead of time (a bit like HTML), but interactions and rendering are handled in a synchronous, on-demand way. This isn't particularly efficient, but lends itself to code that's easy to write.
 
 ### Simple Example
 
@@ -127,8 +127,8 @@ vreader.release()
 window.close()
 ```
 
-The result is a simple video player with playback control, it can be paused/unpaused by pressing the spacebar or the included button next to the playback slider.
-
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/33ab98ba-71a6-43fb-b247-e66e33b37baa">
+  <img src="https://github.com/user-attachments/assets/33ab98ba-71a6-43fb-b247-e66e33b37baa" style="height:300px">
 </p>
+
+The result is a simple video player with playback control via click-and-drag. The video can be paused/unpaused by pressing the spacebar or the included button next to the playback slider. A slightly more sophisticated implementation can be found in the [demos](https://github.com/heyoeyo/toadui/tree/main/demos#video_playbackpy).

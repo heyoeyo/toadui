@@ -88,7 +88,7 @@ class ToggleButton(BaseCallback):
         cls,
         *labels: list[str],
         default_state: bool = False,
-        color_on: COLORU8 = (25, 80, 225),
+        color_on: COLORU8 = (70, 65, 180),
         color_off: COLORU8 | None = None,
         height: int = 40,
         text_scale: float = 0.5,

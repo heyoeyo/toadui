@@ -34,7 +34,7 @@ from numpy import ndarray
 # Set arg defaults
 default_initial_size = 256
 default_max_size = 1024
-default_aspect_ratio = 1.0
+default_aspect_ratio = 1
 default_seed = 1186804540
 default_display_size = 900
 default_framerate = 60
@@ -133,9 +133,11 @@ pattern_lut = {
     "Lidka": gol.make_lidka,
     "R-Pentamino": gol.make_r_pentamino,
     "Rabbits": gol.make_rabbits,
+    "Queen Bee": gol.make_queen_bee,
     "44P5H2V0": gol.make_44P5H2V0,
     "Ark": gol.make_ark,
     "Glider": gol.make_glider,
+    "Gosper Gun": gol.make_gosper_gun,
     "Achim's P16": gol.make_achims_p16,
     "Penta-decathlon": gol.make_penta_decathlon,
     "Pulsar": gol.make_pulsar,
@@ -158,7 +160,7 @@ count_blk = TextBlock(max_characters=10)
 noise_btn, tile_btn, rot_btn = ImmediateButton.many("Noise", "Tile", "Rotate")
 size_slider = Slider("Size", init_height, 32, MAX_H, 32, marker_step=256)
 speed_slider = Slider("Speed", 70, 0, 100, 1, marker_step=50)
-weight_slider = Slider("Weight", 0.8, 0, 1, 0.01, marker_step=0.1)
+weight_slider = Slider("Heatmap", 0.8, 0, 1, 0.01, marker_step=0.1)
 play_btn = ToggleButton("Play", play_on_start, (80, 225, 40), text_color_on=(255, 255, 255))
 step_btn = ImmediateButton("Step", (225, 120, 45), text_color=(255, 255, 255))
 clear_btn = ImmediateButton("Clear", (85, 45, 225), text_color=(255, 255, 255))

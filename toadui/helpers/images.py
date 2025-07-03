@@ -14,6 +14,7 @@ import numpy as np
 from typing import Iterable
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, IMGSHAPE_HW, HWPX, XYNORM, XY1XY2PX, XYPX
+from toadui.helpers.ocv_types import LineTypeCode, OCVLineType
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -230,6 +231,20 @@ def draw_rectangle_norm(
 
     pt1, pt2 = (x1_px, y1_px), (x2_px, y2_px)
     return cv2.rectangle(image_uint8, pt1, pt2, color, thickness)
+
+
+def draw_circle_norm(
+    image_uint8: ndarray,
+    xy_center_norm: XYNORM,
+    radius_px: int = 5,
+    color: COLORU8 = (0, 255, 255),
+    thickness: int = -1,
+    line_type: OCVLineType = LineTypeCode.antialiased,
+) -> ndarray:
+    """Helper used to draw a circle onto an image, using normalized coordinates"""
+    img_h, img_w = image_uint8.shape[0:2]
+    xy_px = (round(xy_center_norm[0] * img_w), round(xy_center_norm[1] * img_h))
+    return cv2.circle(image_uint8, xy_px, radius_px, color, thickness, line_type)
 
 
 def make_horizontal_gradient_image(

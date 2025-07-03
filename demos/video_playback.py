@@ -12,6 +12,7 @@ from toadui.video import LoopingVideoReader, VideoPlaybackSlider, read_webcam_st
 from toadui.images import DynamicImage
 from toadui.text import PrefixedTextBlock
 from toadui.layout import VStack, HStack
+from toadui.helpers.images import draw_circle_norm
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -76,11 +77,13 @@ with window.auto_close(vreader.release):
     for is_paused, frame_idx, frame in vreader:
         playback_slider.update_state(is_paused, frame_idx)
 
-        # Display mouse coordinates when user hovers the image
+        # Display mouse coordinates when user hovers the image & draw circle with outline
         if img_elem.is_hovered():
-            evt = img_elem.get_event_xy()
+            is_clicked, evt = img_elem.read_mouse_xy()
             xynorm_block.set_text(f"({evt.xy_norm.x:.2f}, {evt.xy_norm.y:.2f})")
             xypx_block.set_text(f"({evt.xy_px.x}, {evt.xy_px.y})")
+            frame = draw_circle_norm(frame, evt.xy_norm, radius_px=5)
+            frame = draw_circle_norm(frame.copy(), evt.xy_norm, radius_px=6, color=(0, 0, 0), thickness=1)
 
         # Update displayed image & render
         img_elem.set_image(frame)

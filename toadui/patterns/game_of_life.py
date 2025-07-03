@@ -393,3 +393,40 @@ def make_achims_p16() -> ndarray:
     gd[2:6, 9:13] = np.rot90(gd_4x4, 3)
 
     return gd
+
+
+def make_queen_bee() -> ndarray:
+    gd = np.zeros((5, 7), dtype=np.uint8)
+    gd[0, 3] = 1
+    gd[1, (2, 4)] = 1
+    gd[2, (1, 5)] = 1
+    gd[3, 2:5] = 1
+    gd[4, 0:2] = 1
+    gd[4, 5:7] = 1
+    return gd
+
+
+def make_gosper_gun() -> ndarray:
+    gd_a = np.zeros((6, 7), dtype=np.uint8)
+    gd_a[0, 2:5] = 1
+    gd_a[1, (1, 5)] = 1
+    gd_a[2, (0, 6)] = 1
+    gd_a[3, (1, 5)] = 1
+    gd_a[4, 2:5] = 1
+    gd_a[5, 2:5] = 1
+
+    gd_b = np.zeros((5, 7), dtype=np.uint8)
+    gd_b[0, 2:5] = 1
+    gd_b[1, (1, 2, 4, 5)] = 1
+    gd_b[2, (1, 2, 4, 5)] = 1
+    gd_b[3, 1:6] = 1
+    gd_b[4, (0, 1, 5, 6)] = 1
+
+    gd_sq = np.ones((2, 2), dtype=np.uint8)
+    gd = np.zeros((36, 9), dtype=np.uint8)
+    gd[0:2, 3:5] = gd_sq.copy()
+    gd[34:36, 5:7] = gd_sq.copy()
+    gd[11:17, 0:7] = gd_a
+    gd[21:26, 2:9] = gd_b
+
+    return gd

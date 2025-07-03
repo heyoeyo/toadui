@@ -98,7 +98,6 @@ class HStack(BaseCallback):
                 ptype = self.style.pad_border_type
                 pcolor = self.style.pad_color
                 frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
-                frame_h, frame_w = frame.shape[0:2]
                 # print(" hpad->", tpad, bpad, lpad, rpad)
 
             elif frame_h > h:
@@ -115,7 +114,7 @@ class HStack(BaseCallback):
 
             # Provide callback region to child item
             x1, y1 = x_stack + lpad, y_stack + tpad
-            x2, y2 = x1 + frame_w - rpad, y1 + frame_h - bpad
+            x2, y2 = x1 + frame_w, y1 + frame_h
             child._cb_region.resize(x1, y1, x2, y2)
 
             # Update stacking point for next child
@@ -227,7 +226,6 @@ class VStack(BaseCallback):
                 ptype = self.style.pad_border_type
                 pcolor = self.style.pad_color
                 frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
-                frame_h, frame_w = frame.shape[0:2]
                 # print(" vpad->", tpad, bpad, lpad, rpad)
 
             elif frame_w > w:
@@ -244,7 +242,7 @@ class VStack(BaseCallback):
 
             # Provide callback region to child item
             x1, y1 = x_stack + lpad, y_stack + tpad
-            x2, y2 = x1 + frame_w - rpad, y1 + frame_h - bpad
+            x2, y2 = x1 + frame_w, y1 + frame_h
             child._cb_region.resize(x1, y1, x2, y2)
 
             # Update stacking point for next child
