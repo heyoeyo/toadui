@@ -1,0 +1,15 @@
+# Don't allow these image types (prefer .webp)
+*.bmp
+
+# Don't allow these video types (prefer .mp4)
+*.avi
+*.xvid
+
+# Environment 
+venv/
+.venv/
+env/
+.env/
+
+# Catch-all for local ignorables
+ignore/
