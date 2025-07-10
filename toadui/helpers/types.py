@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
-from typing import NamedTuple, TypeAlias
+from typing import NamedTuple, TypeAlias, Callable
 
 try:
     from typing import Self
@@ -48,3 +48,5 @@ HWPX: TypeAlias = tuple[int, int]
 IMGSHAPE_HW: TypeAlias = tuple[int, int] | tuple[int, int, int]
 
 SelfType: TypeAlias = Self
+
+EmptyCallback: TypeAlias = Callable[[], None]

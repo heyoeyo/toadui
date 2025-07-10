@@ -64,13 +64,14 @@ ui_layout = VStack(
 window = DisplayWindow(display_fps=min(vreader.get_framerate(), 60))
 window.enable_size_control(display_size)
 window.attach_mouse_callbacks(ui_layout)
-window.attach_keypress_callback(" ", vreader.toggle_pause, "Play/Pause the video")
-window.attach_keypress_callback(
-    (KEY.L_ARROW, KEY.R_ARROW), (vreader.prev_frame, vreader.next_frame), "Step video backwards/forwards"
+window.attach_keypress_callbacks(
+    {
+        "Play/Pause the video": {" ": vreader.toggle_pause},
+        "Step video backwards/forwards": {KEY.L_ARROW: vreader.prev_frame, KEY.R_ARROW: vreader.next_frame},
+    }
 )
 
-print("Keyboard Controls:")
-window.report_keypress_descriptions(print_directly=True)
+window.report_keypress_descriptions()
 
 with window.auto_close(vreader.release):
 

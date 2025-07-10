@@ -184,21 +184,20 @@ fps = min(vreader.get_framerate(), 60)
 window = DisplayWindow(display_fps=fps)
 window.enable_size_control(display_size)
 window.attach_mouse_callbacks(ui_layout)
-window.attach_many_keypress_callbacks(
-    [
-        (" ", vreader.toggle_pause, "Play/pause video") if not is_image_source else None,
-        ((",", "."), (tval_slider.decrement, tval_slider.increment), "Adjust effect strength"),
-        ((KEY.D_ARROW, KEY.U_ARROW), (zoom_slider.decrement, zoom_slider.increment), "Adjust zoom level"),
-        (("z", "x"), (xspeed_slider.decrement, xspeed_slider.increment), "Adjust x speed"),
-        (("t", "y"), (yspeed_slider.decrement, yspeed_slider.increment), "Adjust y speed"),
-        ((KEY.L_ARROW, KEY.R_ARROW), (warp_selector.prev, warp_selector.next), "Switch warp function"),
-        (KEY.TAB, (xspeed_slider.reset, yspeed_slider.reset), "Reset X/Y speed"),
-        ("b", border_selector.next, "Switch border mode"),
-        ("r", rbow_toggle.toggle, "Toggle rainbow coloring"),
-    ]
+window.attach_keypress_callbacks(
+    {
+        "Toggle playback": {" ": vreader.toggle_pause} if not is_image_source else None,
+        "Adjust effect strength": {",": tval_slider.decrement, ".": tval_slider.increment},
+        "Adjust zoom level": {KEY.D_ARROW: zoom_slider.decrement, KEY.U_ARROW: zoom_slider.increment},
+        "Adjust x speed": {"z": xspeed_slider.decrement, "x": xspeed_slider.increment},
+        "Adjust y speed": {"t": yspeed_slider.decrement, "y": yspeed_slider.increment},
+        "Reset X/Y Speed": {KEY.TAB: (xspeed_slider.reset, yspeed_slider.reset)},
+        "Switch warp function": {KEY.L_ARROW: warp_selector.prev, KEY.R_ARROW: warp_selector.next},
+        "Switch border mode": {"b": border_selector.next},
+        "Toggle rainbow coloring": {"r": rbow_toggle.toggle},
+    }
 )
-print("", "***** Keypress controls: *****", sep="\n")
-window.report_keypress_descriptions(print_directly=True)
+window.report_keypress_descriptions()
 
 # Initialize values used inside of loop
 rbow_idx = 0

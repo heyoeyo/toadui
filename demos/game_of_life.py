@@ -222,22 +222,21 @@ hover_changed = ValueChangeTracker(False)
 window = DisplayWindow(display_fps=DISPLAY_FPS)
 window.enable_size_control(init_display_size)
 window.attach_mouse_callbacks(ui_layout)
-window.attach_many_keypress_callbacks(
-    [
-        ((KEY.L_ARROW, KEY.R_ARROW), (pattern_selector.prev, pattern_selector.next), "Change placeable pattern"),
-        ((KEY.D_ARROW, KEY.U_ARROW), (size_slider.decrement, size_slider.increment), "Adjust grid size"),
-        (KEY.TAB, cmap_bar.next, "Cycle colormapping"),
-        (" ", play_btn.toggle, "Play/pause"),
-        ("s", step_btn.click, "Advance one step"),
-        ("n", noise_btn.click, "Reset to new noise state"),
-        ("t", tile_btn.click, "Tile current selected shape"),
-        ("r", rot_btn.click, "Rotate 90 degrees clockwise"),
-        ("c", clear_btn.click, "Clear entire state"),
-    ]
+window.attach_keypress_callbacks(
+    {
+        "Change placeable pattern": {KEY.L_ARROW: pattern_selector.prev, KEY.R_ARROW: pattern_selector.next},
+        "Adjust grid size": {KEY.D_ARROW: size_slider.decrement, KEY.U_ARROW: size_slider.increment},
+        "Cycle colormapping": {KEY.TAB: cmap_bar.next},
+        "Play/Pause": {" ": play_btn.toggle},
+        "Advance one step": {"s": step_btn.click},
+        "Reset to new noise state": {"n": noise_btn.click},
+        "Tile current selected shape": {"t": tile_btn.click},
+        "Rotate 90 degrees clockwise": {"r": rot_btn.click},
+        "Clear entire state": {"c": clear_btn.click},
+    }
 )
-print("", "***** Keypress controls: *****", sep="\n")
-window.report_keypress_descriptions(print_directly=True)
-print("")
+
+window.report_keypress_descriptions()
 
 with window.auto_close():
 

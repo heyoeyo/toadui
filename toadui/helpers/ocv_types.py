@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
-from typing import TypeAlias
+from typing import TypeAlias, Callable, Protocol
 from enum import IntEnum
 
 import cv2
@@ -74,3 +74,11 @@ OCVInterp: TypeAlias = None | int | InterpCode
 OCVFont: TypeAlias = None | int | FontCode
 OCVLineType: TypeAlias = None | int | LineTypeCode
 OCVEvent: TypeAlias = int | EventCode
+OCVFlag: TypeAlias = int
+
+# Helper used to hint opencv mouse callbacks (event, x_px, y_px, flags, params)
+OCVCallback: TypeAlias = Callable[[OCVEvent, int, int, OCVFlag, None], None]
+
+
+class HasOCVCallback(Protocol):
+    def _on_opencv_event(self, event: OCVEvent, x: int, y: int, flags: int, params: None) -> None: ...

@@ -109,7 +109,7 @@ ui_layout = tui.VStack(img_elem, playback_slider)
 # Set up display window and attach UI for mouse interactions
 window = tui.DisplayWindow(display_fps=vreader.get_framerate())
 window.attach_mouse_callbacks(ui_layout)
-window.attach_keypress_callback(" ", vreader.toggle_pause)
+window.attach_one_keypress_callback(" ", vreader.toggle_pause)
 
 while True:
     is_paused, frame_idx, frame = vreader.read()
