@@ -34,7 +34,7 @@ class TextBlock(CachedBgFgElement):
         text_scale: float = 0.35,
         max_characters: int = 8,
         height: int = 40,
-        is_flexible_w: bool = False,
+        is_flexible_w: bool = True,
     ):
 
         # Set up text drawing config
@@ -105,9 +105,9 @@ class PrefixedTextBlock(TextBlock):
         suffix: str = "",
         color: COLORU8 = (30, 25, 25),
         text_scale: float = 0.35,
-        max_characters: int = 8,
+        max_characters: int | str = 8,
         height: int = 40,
-        is_flexible_w: bool = False,
+        is_flexible_w: bool = True,
     ):
 
         # Set up text drawing config
@@ -115,6 +115,10 @@ class PrefixedTextBlock(TextBlock):
         self._suffix = str(suffix)
         self._prev_value = None
         self._curr_text = ""
+
+        # Convert max character strings to character count
+        if isinstance(max_characters, str):
+            max_characters = len(max_characters)
 
         spacer_txt = "*" * max_characters
         init_txt = f"{prefix}{spacer_txt}{suffix}"

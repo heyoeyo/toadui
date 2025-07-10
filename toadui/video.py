@@ -40,6 +40,10 @@ class PauseableVideoReader(Protocol):
 
     def set_playback_position(self, position: int | float, is_normalized=False) -> int: ...
 
+    def next_frame(self, num_frames: int) -> SelfType: ...
+
+    def prev_frame(self, num_frames=int) -> SelfType: ...
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -326,6 +330,12 @@ class ImageAsVideoReader(PauseableVideoReader):
         """
         return self._is_paused, self._frame_idx, self._scaled_frame
 
+    def next_frame(self, num_frames=1) -> SelfType:
+        return self
+
+    def prev_frame(self, num_frames=1) -> SelfType:
+        return self.next_frame(-num_frames)
+
     def get_pause_state(self) -> bool:
         return self._is_paused
 
@@ -572,6 +582,7 @@ class VideoPlaybackSlider(BaseCallback):
             indicator_width=indicator_line_width,
             indicator_color=ind_color,
             outline_color=(0, 0, 0),
+            button=None,
         )
 
         # Add styling for button if included
@@ -582,7 +593,7 @@ class VideoPlaybackSlider(BaseCallback):
                 hide=False,
                 swap_icons=False,
             )
-            self.style.add(button=btn_style)
+            self.style.update(button=btn_style)
 
         # Inherit from parent & set default helper name for debugging
         min_w = max(height, minimum_width)
@@ -810,12 +821,20 @@ def check_is_image(file_path: str | ndarray) -> bool:
 def load_looping_video_or_image(
     video_or_image_path: str | ndarray, display_size_px: int | None = None
 ) -> LoopingVideoReader | ImageAsVideoReader:
+    """
+    Helper used to load either a 'image as video' or looping video reader.
+    This can be used to support having a video input while also supporting
+    static images (as if they are repeating videos with a single frame).
+    Returns:
+        is_static_image, video_reader
 
-    is_image = check_is_image(video_or_image_path)
-    ReaderClass = ImageAsVideoReader if is_image else LoopingVideoReader
+    """
+
+    is_static_image = check_is_image(video_or_image_path)
+    ReaderClass = ImageAsVideoReader if is_static_image else LoopingVideoReader
     reader = ReaderClass(video_or_image_path, display_size_px)
 
-    return is_image, reader
+    return is_static_image, reader
 
 
 def read_webcam_string(input_source: str | int | None):

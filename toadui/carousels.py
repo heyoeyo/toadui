@@ -44,7 +44,7 @@ class TextCarousel(CachedBgFgElement):
 
         # Store basic state
         self._init_idx = 0
-        self._is_changed = False
+        self._is_changed = True
         self._enable_wrap_around = True
         self._curr_idx = self._init_idx
         self._keys = tuple(key_value_pairs.keys())
