@@ -385,7 +385,7 @@ class DisplayWindow:
 # %% Functions
 
 
-def _many_callbacks_to_one(*callbacks: Iterable[EmptyCallback]) -> EmptyCallback:
+def _many_callbacks_to_one(callbacks: Iterable[EmptyCallback]) -> EmptyCallback:
     """
     Helper used to create a 'single' callback function which
     itself calls multiple callbacks in sequence
