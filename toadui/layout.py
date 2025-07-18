@@ -12,6 +12,7 @@ from toadui.base import BaseCallback
 from toadui.helpers.styling import UIStyle
 
 # For type hints
+from typing import Iterable
 from numpy import ndarray
 from toadui.base import BaseOverlay, CBRenderSizing
 from toadui.helpers.types import SelfType, HWPX
@@ -22,17 +23,14 @@ from toadui.helpers.types import SelfType, HWPX
 
 
 class HStack(BaseCallback):
-    """
-    Layout element which stacks UI items together horizontally.
-
-    """
+    """Layout element which stacks UI items together horizontally"""
 
     # .................................................................................................................
 
     def __init__(
         self,
         *items: BaseCallback,
-        flex: tuple | None = None,
+        flex: Iterable[float | None] | None = None,
         min_w: int | None = None,
         error_on_size_constraints: bool = False,
     ):
@@ -50,6 +48,11 @@ class HStack(BaseCallback):
         min_w = max(total_child_min_w, min_w if min_w is not None else 1)
         self._cb_rdr = CBRenderSizing(min_h, min_w, is_flex_h, is_flex_w)
 
+        # Default to sizing by aspect ratio if no flex values are given
+        # -> Don't use AR sizing if not flexible (implies stacking doesn't have target AR)
+        multiple_ar_children = sum(child._get_dynamic_aspect_ratio() is not None for child in self) > 1
+        self._size_by_ar = flex is None and (is_flex_w and is_flex_h) and multiple_ar_children
+
         # Pre-compute sizing info for handling flexible sizing
         is_flex_w_per_child = [child._cb_rdr.is_flexible_w for child in self]
         flex_per_child_list = _read_flex_values(is_flex_w_per_child, flex)
@@ -57,7 +60,7 @@ class HStack(BaseCallback):
         for child, flex_val in zip(self, flex_per_child_list):
             is_flexible = flex_val > 1e-2
             fixed_width_of_children += 0 if is_flexible else child._cb_rdr.min_w
-        self._fixed_width = fixed_width_of_children
+        self._fixed_flex_width = fixed_width_of_children
         self._cumlative_flex = np.cumsum(flex_per_child_list, dtype=np.float32)
         self._flex_debug = flex_per_child_list
         self._error_on_constraints = error_on_size_constraints
@@ -76,12 +79,25 @@ class HStack(BaseCallback):
         x_stack = self._cb_region.x1
         y_stack = self._cb_region.y1
 
-        # Assign per-element sizing, taking into account flex scaling
-        avail_w = max(0, w - self._fixed_width)
-        flex_w_px = np.diff(np.int32(np.round(self._cumlative_flex * avail_w)), prepend=0).tolist()
-        w_per_child_list = [
-            max(1, flex_w) if flex_w > 0 else child._cb_rdr.min_w for child, flex_w in zip(self, flex_w_px)
-        ]
+        if self._size_by_ar:
+            w_per_child_list = [child._get_width_given_height(h) for child in self]
+            total_w = sum(w_per_child_list)
+            if total_w != w:
+                fix_list = []
+                flex_list = []
+                for child, child_w in zip(self, w_per_child_list):
+                    fix_list.append(0 if child._cb_rdr.is_flexible_w else child._cb_rdr.min_w)
+                    flex_list.append(child_w if child._cb_rdr.is_flexible_w else 0)
+
+                avail_w = w - sum(fix_list)
+                cumulative_w = np.cumsum(flex_list, dtype=np.float32) * avail_w / sum(flex_list)
+                flex_list = np.diff(np.int32(np.round(cumulative_w)), prepend=0).tolist()
+                w_per_child_list = [fixed_w if fixed_w > 0 else flex_w for fixed_w, flex_w in zip(fix_list, flex_list)]
+        else:
+            # Assign per-element sizing, taking into account flex scaling
+            avail_w = max(0, w - self._fixed_flex_width)
+            flex_w_px = np.diff(np.int32(np.round(self._cumlative_flex * avail_w)), prepend=0).tolist()
+            w_per_child_list = [flex_w if flex_w > 0 else child._cb_rdr.min_w for child, flex_w in zip(self, flex_w_px)]
 
         # Have each child item draw itself
         imgs_list = []
@@ -89,18 +105,9 @@ class HStack(BaseCallback):
             frame = child._render_up_to_size(h, ch_render_w)
             frame_h, frame_w = frame.shape[0:2]
 
-            # Adjust frame height if needed
-            tpad, bpad, lpad, rpad = 0, 0, 0, 0
-            if frame_h < h:
-                available_h = h - frame_h
-                tpad = available_h // 2
-                bpad = available_h - tpad
-                ptype = self.style.pad_border_type
-                pcolor = self.style.pad_color
-                frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
-                # print(" hpad->", tpad, bpad, lpad, rpad)
-
-            elif frame_h > h:
+            # Crop overly-tall images
+            # -> Don't need to crop wide images, since h-stacking won't break!
+            if frame_h > h:
                 print(
                     f"Render sizing error! Expecting height: {h}, got {frame_h} ({child})",
                     "-> Will crop!",
@@ -108,6 +115,18 @@ class HStack(BaseCallback):
                 )
                 frame = frame[:h, :, :]
                 frame_h = h
+
+            # Adjust frame height if needed
+            tpad, lpad, bpad, rpad = 0, 0, 0, 0
+            need_pad = (frame_h < h) or (frame_w < ch_render_w)
+            if need_pad:
+                available_h = h - frame_h
+                available_w = max(0, ch_render_w - frame_w)
+                tpad, lpad = available_h // 2, available_w // 2
+                bpad, rpad = available_h - tpad, available_w - lpad
+                ptype = self.style.pad_border_type
+                pcolor = self.style.pad_color
+                frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
 
             # Store image
             imgs_list.append(frame)
@@ -118,25 +137,61 @@ class HStack(BaseCallback):
             child._cb_region.resize(x1, y1, x2, y2)
 
             # Update stacking point for next child
-            x_stack = x2
+            x_stack = x2 + rpad
 
         return np.hstack(imgs_list)
 
     # .................................................................................................................
+
+    def _get_dynamic_aspect_ratio(self) -> float | None:
+        if self._cb_rdr.is_flexible_h and self._cb_rdr.is_flexible_w:
+            child_ar = (c._get_dynamic_aspect_ratio() for c in self)
+            ar = sum(ar if ar is not None else 0 for ar in child_ar)
+            return None if ar == 0 else ar
+        return None
+
+    def _get_width_given_height(self, h: int) -> int:
+
+        if not self._cb_rdr.is_flexible_w:
+            return self._cb_rdr.min_w
+
+        # Ask child elements for desired width and use total
+        w_per_child_list = [child._get_width_given_height(h) for child in self]
+        total_child_w = sum(w_per_child_list)
+        return max(self._cb_rdr.min_w, total_child_w)
 
     def _get_height_given_width(self, w: int) -> int:
         """
         For h-stacking, we normally want to set a height since this must be shared
         for all elements in order to stack horizontally. Here we don't know the height.
 
-        To figure out a height, we first figure out how much space (width) each child
-        should be given, based on the given target width. Then, each child is asked
-        for it's render size (h & w) for the given width. We take the 'tallest'
-        child height as the height we'll use for stacking.
+        If sizing by aspect ratio, we calculate the height from knowing that all
+        items must stack to the target width, while sharing the same height:
+            target_w = (h * ar1) + (h * ar2) + (h * ar3) + ...
+            target_w = h * (ar1 + ar2 + ar3)
+            Therefore, h = target_w / sum(ar for all item aspect ratios)
+
+        If sizing by flex values, we first figure out how much 'width' each child
+        should be assigned. Then each child is asked for it's render height, given
+        the assigned width. We take the 'tallest' child height as the height for stacking.
+
+        Returns:
+            render_height
         """
 
-        # Figure out per-element width based on the target total width
-        avail_w = max(0, w - self._fixed_width)
+        # Use fixed height if not flexible
+        if not self._cb_rdr.is_flexible_h:
+            return self._cb_rdr.min_h
+
+        # Allocate height based on child aspect ratios
+        if self._size_by_ar:
+            avail_w = max(0, w - self._fixed_flex_width)
+            child_ar = (c._get_dynamic_aspect_ratio() for c in self)
+            h = avail_w / sum(ar if ar is not None else 0 for ar in child_ar)
+            return max(self._cb_rdr.min_h, round(h))
+
+        # Figure out per-element width based on flex assignment
+        avail_w = max(0, w - self._fixed_flex_width)
         flex_sizing_px = np.diff(np.int32(np.round(self._cumlative_flex * avail_w)), prepend=0).tolist()
         w_per_child_list = [max(child._cb_rdr.min_w, flex_w) for child, flex_w in zip(self, flex_sizing_px)]
 
@@ -146,13 +201,14 @@ class HStack(BaseCallback):
             assert total_computed_w == w, f"Error computing target widths ({self})! Target: {w}, got {total_computed_w}"
 
         # We'll say our height, given the target width, is that of the tallest child element
-        h_per_child_list = [child._get_height_given_width(w) for child, w in zip(self, w_per_child_list)]
+        h_per_child_list = (child._get_height_given_width(w) for child, w in zip(self, w_per_child_list))
         return max(h_per_child_list)
 
     # .................................................................................................................
 
 
 class VStack(BaseCallback):
+    """Layout element which stacks UI items together vertically"""
 
     # .................................................................................................................
 
@@ -177,6 +233,11 @@ class VStack(BaseCallback):
         min_w = widest_child_min_w
         self._cb_rdr = CBRenderSizing(min_h, min_w, is_flex_h, is_flex_w)
 
+        # Default to sizing by aspect ratio if not given flex values
+        # -> Don't use AR sizing if not flexible (implies stacking doesn't have target AR)
+        multiple_ar_children = sum(child._get_dynamic_aspect_ratio() is not None for child in self) > 1
+        self._size_by_ar = flex is None and (is_flex_w and is_flex_h) and multiple_ar_children
+
         # Pre-compute sizing info for handling flexible sizing
         is_flex_h_per_child = [child._cb_rdr.is_flexible_h for child in self]
         flex_per_child_list = _read_flex_values(is_flex_h_per_child, flex)
@@ -184,7 +245,7 @@ class VStack(BaseCallback):
         for child, flex_val in zip(self, flex_per_child_list):
             is_flexible = flex_val > 1e-3
             fixed_height_of_children += 0 if is_flexible else child._cb_rdr.min_h
-        self._fixed_height = fixed_height_of_children
+        self._fixed_flex_height = fixed_height_of_children
         self._cumlative_flex = np.cumsum(flex_per_child_list, dtype=np.float32)
         self._flex_debug = flex_per_child_list
         self._error_on_constraints = error_on_size_constraints
@@ -203,12 +264,25 @@ class VStack(BaseCallback):
         x_stack = self._cb_region.x1
         y_stack = self._cb_region.y1
 
-        # Assign per-element flex sizing
-        avail_h = max(0, h - self._fixed_height)
-        flex_h_px = np.diff(np.int32(np.round(self._cumlative_flex * avail_h)), prepend=0).tolist()
-        h_per_child_list = [
-            max(1, flex_h) if flex_h > 0 else child._cb_rdr.min_h for child, flex_h in zip(self, flex_h_px)
-        ]
+        if self._size_by_ar:
+            h_per_child_list = [child._get_height_given_width(w) for child in self]
+            total_h = sum(h_per_child_list)
+            if total_h != h:
+                fix_list = []
+                flex_list = []
+                for child, child_h in zip(self, h_per_child_list):
+                    fix_list.append(0 if child._cb_rdr.is_flexible_h else child._cb_rdr.min_h)
+                    flex_list.append(child_h if child._cb_rdr.is_flexible_h else 0)
+
+                avail_h = h - sum(fix_list)
+                cumulative_h = np.cumsum(flex_list, dtype=np.float32) * avail_h / sum(flex_list)
+                flex_list = np.diff(np.int32(np.round(cumulative_h)), prepend=0).tolist()
+                h_per_child_list = [fixed_h if fixed_h > 0 else flex_h for fixed_h, flex_h in zip(fix_list, flex_list)]
+        else:
+            # Assign per-element sizing, taking into account flex scaling
+            avail_h = max(0, h - self._fixed_flex_height)
+            flex_h_px = np.diff(np.int32(np.round(self._cumlative_flex * avail_h)), prepend=0).tolist()
+            h_per_child_list = [flex_h if flex_h > 0 else child._cb_rdr.min_h for child, flex_h in zip(self, flex_h_px)]
 
         # Have each child item draw itself
         imgs_list = []
@@ -216,19 +290,9 @@ class VStack(BaseCallback):
             frame = child._render_up_to_size(ch_render_h, w)
             frame_h, frame_w = frame.shape[0:2]
 
-            # Adjust frame width if needed
-            tpad, bpad, lpad, rpad = 0, 0, 0, 0
-            if frame_w < w:
-                available_w = w - frame_w
-                lpad = available_w // 2
-                rpad = available_w - lpad
-                tpad, bpad = 0, 0
-                ptype = self.style.pad_border_type
-                pcolor = self.style.pad_color
-                frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
-                # print(" vpad->", tpad, bpad, lpad, rpad)
-
-            elif frame_w > w:
+            # Crop overly-wide images
+            # -> Don't need to crop tall images, since v-stacking won't break!
+            if frame_w > w:
                 print(
                     f"Render sizing error! Expecting width: {w}, got {frame_w} ({child})",
                     "-> Will crop!",
@@ -236,6 +300,19 @@ class VStack(BaseCallback):
                 )
                 frame = frame[:, :w, :]
                 frame_w = w
+
+            # Adjust frame width if needed
+            tpad, lpad, bpad, rpad = 0, 0, 0, 0
+            need_pad = (frame_w < w) or (frame_h < ch_render_h)
+            if need_pad:
+                available_w = w - frame_w
+                available_h = max(0, ch_render_h - frame_h)
+                tpad, lpad = available_h // 2, available_w // 2
+                bpad, rpad = available_h - tpad, available_w - lpad
+                ptype = self.style.pad_border_type
+                pcolor = self.style.pad_color
+                frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
+                # print(" vpad->", tpad, bpad, lpad, rpad)
 
             # Store image
             imgs_list.append(frame)
@@ -246,7 +323,7 @@ class VStack(BaseCallback):
             child._cb_region.resize(x1, y1, x2, y2)
 
             # Update stacking point for next child
-            y_stack = y2
+            y_stack = y2 + bpad
 
         out_img = np.vstack(imgs_list)
         if len(self._cb_parent_list) == 0:
@@ -259,19 +336,57 @@ class VStack(BaseCallback):
 
     # .................................................................................................................
 
+    def _get_dynamic_aspect_ratio(self) -> float | None:
+        if self._cb_rdr.is_flexible_h and self._cb_rdr.is_flexible_w:
+            child_ar = (c._get_dynamic_aspect_ratio() for c in self)
+            inv_ar_sum = sum(1 / ar if ar is not None else 0 for ar in child_ar)
+            return None if inv_ar_sum == 0 else 1 / inv_ar_sum
+
+        return None
+
+    def _get_height_given_width(self, w: int) -> int:
+
+        # Use fixed height if not flexible
+        if not self._cb_rdr.is_flexible_h:
+            return self._cb_rdr.min_h
+
+        # Ask child elements for desired width and use total
+        h_per_child_list = [child._get_height_given_width(w) for child in self]
+        total_child_h = sum(h_per_child_list)
+        return max(self._cb_rdr.min_h, total_child_h)
+
     def _get_width_given_height(self, h: int) -> int:
         """
         For v-stacking, we normally want to set a width since this must be shared
         for all elements in order to stack vertically. Here we don't know the width.
 
-        To figure out a width, we first figure out how much space (height) each child
-        should be given, based on the given target height. Then, each child is asked
-        for it's render size (h & w) for the given height. We take the 'widest'
-        child width as the width we'll use for stacking.
+        If sizing by aspect ratio, we calculate the width from knowing that all
+        items must stack to the target height, while sharing the same width:
+            target_h = (w / ar1) + (w / ar2) + (w / ar3) + ...
+            target_h = w * (1/ar1 + 1/ar2 + 1/ar3)
+            Therefore, w = target_h / sum(1/ar for all item aspect ratios)
+
+        If sizing by flex values, we first figure out how much 'height' each child
+        should be assigned. Then each child is asked for it's render width, given
+        the assigned height. We take the 'widest' child width as the width for stacking.
+
+        Returns:
+            render_width
         """
 
-        # Figure out per-element height based on the target total height
-        avail_h = max(0, h - self._fixed_height)
+        # Use fixed width if not flexible
+        if not self._cb_rdr.is_flexible_w:
+            return self._cb_rdr.min_w
+
+        # Allocate width based on child aspect ratios
+        if self._size_by_ar:
+            avail_h = max(1, h - self._fixed_flex_height)
+            child_ar = (c._get_dynamic_aspect_ratio() for c in self)
+            w = avail_h / sum(1 / ar if ar is not None else 0 for ar in child_ar)
+            return max(self._cb_rdr.min_w, round(w))
+
+        # Figure out per-element height based on flex assignment
+        avail_h = max(0, h - self._fixed_flex_height)
         flex_sizing_px = np.diff(np.int32(np.round(self._cumlative_flex * avail_h)), prepend=0).tolist()
         h_per_child_list = [max(child._cb_rdr.min_h, flex_h) for child, flex_h in zip(self, flex_sizing_px)]
 
@@ -281,7 +396,7 @@ class VStack(BaseCallback):
             assert total_computed_h == h, f"Error computing target height ({self})! Target: {h}, got {total_computed_h}"
 
         # We'll say our width, given the target height, is that of the widest child element
-        w_per_child_list = [child._get_width_given_height(h=h) for child, h in zip(self, h_per_child_list)]
+        w_per_child_list = (child._get_width_given_height(h=h) for child, h in zip(self, h_per_child_list))
         return max(w_per_child_list)
 
     # .................................................................................................................
@@ -602,6 +717,12 @@ class GridStack(BaseCallback):
 
 
 class OverlayStack(BaseCallback):
+    """
+    Element used to combine multiple overlays onto a single base item.
+    (i.e. stacks overlays ontop of one another).
+
+    This is mainly intended for better efficiency when using many overlays together.
+    """
 
     # .................................................................................................................
 
@@ -680,29 +801,32 @@ class OverlayStack(BaseCallback):
 
 
 def _read_flex_values(
-    item_can_expand_list: list[bool],
+    item_is_flexible_list: list[bool],
     flex: tuple[float] | None,
     allow_undersizing: bool = True,
 ) -> tuple[float]:
     """
     Helper used to compute normalized flex values
-    - Replaces 'None' entries with 0
-    - If allow_undersizing is False, then normalized flex values to sum to 1
-    -> If True, then values less than 1 will remain as-is (so sum can be less than 1)
-    -> This allows for 'shrinking' UI elements below given space allocation
+    - 'None' values are interpreted as 'fallback' to item flexibility
+    - If allow_undersizing is False, then normalized flex values will sum to 1
+    - If allow_undersizing is True, then values less than 1 will remain as-is
+      (so sum can be less than 1). This allows for 'shrinking' UI elements
+      below given space allocation. For example, flex=(0.25, 0.25), would
+      result in the items taking up only half of the total available space.
     """
 
-    # If no flex sizing is given, default to 0/1 based on whether items are configured as flexible
+    # If no flex sizing is given, default to 'fallback' for every item
     if flex is None:
-        flex = [float(can_expand) for can_expand in item_can_expand_list]
+        flex = [None] * len(item_is_flexible_list)
 
     # Sanity check, make sure we have flex sizing for each callback item
     flex = tuple(flex)
-    num_items = len(item_can_expand_list)
-    assert len(flex) == num_items, "Flex sizing error! Must match number of entries ({num_items})"
+    num_items = len(item_is_flexible_list)
+    assert len(flex) == num_items, f"Flex error! Must match number of entries ({num_items}), got: flex={flex}"
 
-    # Iterpret flex values of None as zeros (i.e. not flexible)
-    out_flex = tuple(abs(val) if val is not None else 0 for val in flex)
+    # Iterpret flex values of None as fallback to item flexibility
+    out_flex = (val if val is not None else float(is_flex) for val, is_flex in zip(flex, item_is_flexible_list))
+    out_flex = tuple(max(0, val) for val in out_flex)
 
     # Normalize flex values so they can be used as weights when deciding render sizes
     total_flex = sum(out_flex)

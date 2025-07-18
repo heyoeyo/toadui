@@ -29,12 +29,14 @@ class DynamicImage(BaseCallback):
     def __init__(
         self,
         image: ndarray | None = None,
-        min_side_length: int = 64,
+        min_side_length: int = 128,
         resize_interpolation: OCVInterp = None,
+        is_flexible_h: bool = True,
+        is_flexible_w: bool = True,
     ):
 
         # Inherit from parent
-        super().__init__(min_side_length, min_side_length, is_flexible_h=True, is_flexible_w=True)
+        super().__init__(min_side_length, min_side_length, is_flexible_h, is_flexible_w)
 
         # Store sizing info
         self._min_side_length = min_side_length
@@ -110,8 +112,11 @@ class DynamicImage(BaseCallback):
         return scaled_h
 
     def _get_height_and_width_without_hint(self) -> HWPX:
-        img_h, img_w = self._full_image.shape[0:2]
-        return img_h, img_w
+        return self._full_image.shape[0:2]
+
+    def _get_dynamic_aspect_ratio(self):
+        is_flexible = self._cb_rdr.is_flexible_h and self._cb_rdr.is_flexible_h
+        return self._full_image.shape[1] / self._full_image.shape[0] if is_flexible else None
 
     # .................................................................................................................
 
@@ -153,34 +158,37 @@ class StretchImage(DynamicImage):
         self,
         image: ndarray,
         aspect_ratio: float | None = 1,
-        min_h: int = 64,
-        min_w: int = 64,
+        min_h: int = 128,
+        min_w: int = 128,
         resize_interpolation: OCVInterp = None,
+        is_flexible_h=True,
+        is_flexible_w=True,
     ):
-        super().__init__(image, resize_interpolation=resize_interpolation)
 
         # Precompute aspect ratio settings for scaling
         self._has_ar = aspect_ratio is not None
-        self._ar = max(aspect_ratio, 0.001) if self._has_ar else -1
-        self._ar_inv = 1.0 / self._ar
+        self._w_over_h = max(aspect_ratio, 0.001) if self._has_ar else -1
+        self._h_over_w = 1.0 / self._w_over_h
 
         # Override parent sizing & styling
-        self._cb_rdr = CBRenderSizing(min_h, min_w, is_flexible_h=True, is_flexible_w=True)
+        super().__init__(image, resize_interpolation=resize_interpolation)
+        self._cb_rdr = CBRenderSizing(min_h, min_w, is_flexible_h, is_flexible_w)
 
     # .................................................................................................................
 
     def _get_width_given_height(self, h: int) -> int:
-        ar = self._ar if self._has_ar else self._full_image.shape[1] / self._full_image.shape[0]
-        print(h, self._ar, ar)
+        ar = self._w_over_h if self._has_ar else self._full_image.shape[1] / self._full_image.shape[0]
         return max(self._cb_rdr.min_w, round(h * ar))
 
     def _get_height_given_width(self, w: int) -> int:
-        ar_inv = self._ar_inv if self._has_ar else self._full_image.shape[0] / self._full_image.shape[1]
+        ar_inv = self._h_over_w if self._has_ar else self._full_image.shape[0] / self._full_image.shape[1]
         return max(self._cb_rdr.min_h, round(w * ar_inv))
 
     def _get_height_and_width_without_hint(self) -> HWPX:
-        img_h, img_w = self._full_image.shape[0:2]
-        return img_h, img_w
+        return self._full_image.shape[0:2]
+
+    def _get_dynamic_aspect_ratio(self):
+        return self._w_over_h if self._has_ar else None
 
     def _render_up_to_size(self, h: int, w: int) -> ndarray:
 

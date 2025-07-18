@@ -143,10 +143,32 @@ class BaseCallback(CBChild):
         self._cb_parent_list: BaseCallback = []
         self._cb_child_list: BaseCallback = []
 
+        # Storage for name that can be printed when debugging
+        self._debug_name = None
+
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
         child_names = [str(child) for child in self]
         return f"{cls_name} [{', '.join(child_names)}]" if len(child_names) > 0 else cls_name
+
+    # .................................................................................................................
+
+    def _set_debug_name(self, name: str) -> SelfType:
+        """
+        Helper used for debugging. Assigns a 'debug name' used by
+        the ._print_debug(...) function
+        """
+        self._debug_name = name
+        return self
+
+    def _print_debug(self, *values, sep=" ", flush=False):
+        """
+        Helper used for debugging. Acts like a regular print statement,
+        but will prefix a 'debug name' to each printed line.
+        """
+        debug_name = self._debug_name if self._debug_name is not None else self.__class__.__name__[0:4]
+        print(f"{debug_name} |", *values, sep=sep, flush=flush)
+        return None
 
     # .................................................................................................................
 
@@ -385,6 +407,20 @@ class BaseCallback(CBChild):
         """Function used to communicate how wide & tall an element will be, if no size is specified"""
         return self._cb_rdr.min_h, self._cb_rdr.min_w
 
+    def _get_dynamic_aspect_ratio(self) -> float | None:
+        """
+        Function used to report the aspect ratio of an element's
+        non-fixed sized components, if any, for rendering purposes.
+        If an element does not have a target aspect ratio, for example a button,
+        then it should return None. By comparison, an image may render at a
+        fixed aspect ratio, and should report that number instead.
+
+        Other elements may include a fixed sized element, along with a
+        resizing element, in this case, only the aspect ratio of the
+        dynamic element component should be reported.
+        """
+        return None
+
     # .................................................................................................................
 
 
@@ -456,6 +492,9 @@ class BaseOverlay(BaseCallback):
         return self._render_overlay(base_frame)
 
     # .................................................................................................................
+
+    def _get_dynamic_aspect_ratio(self):
+        return self._base_item._get_dynamic_aspect_ratio()
 
     def _get_height_and_width_without_hint(self) -> HWPX:
         return self._base_item._get_height_and_width_without_hint()
