@@ -10,12 +10,8 @@ import numpy as np
 
 from toadui.base import BaseCallback, CachedBgFgElement
 from toadui.helpers.text import TextDrawer
-from toadui.helpers.images import (
-    blank_image,
-    draw_box_outline,
-    draw_drop_shadow,
-    draw_rectangle_norm,
-)
+from toadui.helpers.images import blank_image
+from toadui.helpers.drawing import draw_box_outline, draw_drop_shadow, draw_rectangle_norm
 from toadui.helpers.colors import adjust_as_hsv, pick_contrasting_gray_color, lerp_colors
 from toadui.helpers.styling import UIStyle
 

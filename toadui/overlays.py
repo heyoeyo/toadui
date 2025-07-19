@@ -10,7 +10,7 @@ import numpy as np
 
 from toadui.base import BaseCallback, BaseOverlay, CBEventXY
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.images import draw_normalized_polygon
+from toadui.helpers.drawing import draw_normalized_polygon
 from toadui.helpers.text import TextDrawer
 
 # Typing

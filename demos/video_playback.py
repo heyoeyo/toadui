@@ -12,7 +12,7 @@ from toadui.video import LoopingVideoReader, VideoPlaybackSlider, read_webcam_st
 from toadui.images import DynamicImage
 from toadui.text import PrefixedTextBlock
 from toadui.layout import VStack, HStack
-from toadui.helpers.images import draw_circle_norm
+from toadui.helpers.drawing import draw_circle_norm
 
 
 # ---------------------------------------------------------------------------------------------------------------------

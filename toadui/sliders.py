@@ -12,7 +12,8 @@ from toadui.base import CachedBgFgElement
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import pick_contrasting_gray_color, lerp_colors
 from toadui.helpers.text import TextDrawer
-from toadui.helpers.images import blank_image, draw_box_outline
+from toadui.helpers.images import blank_image
+from toadui.helpers.drawing import draw_box_outline
 
 # Typing
 from numpy import ndarray

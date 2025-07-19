@@ -9,7 +9,8 @@ import numpy as np
 
 from toadui.base import CachedBgFgElement
 from toadui.text import TextDrawer
-from toadui.helpers.images import blank_image, draw_box_outline, draw_normalized_polygon
+from toadui.helpers.images import blank_image
+from toadui.helpers.drawing import draw_box_outline, draw_normalized_polygon
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import pick_contrasting_gray_color
 

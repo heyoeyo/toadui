@@ -10,7 +10,8 @@ import cv2
 from toadui.base import BaseCallback
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.text import TextDrawer
-from toadui.helpers.images import blank_image, draw_box_outline, get_image_hw_to_fill
+from toadui.helpers.images import blank_image, get_image_hw_to_fill
+from toadui.helpers.drawing import draw_box_outline
 from toadui.helpers.colors import pick_contrasting_gray_color
 
 # For type hints

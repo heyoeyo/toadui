@@ -10,7 +10,8 @@ import cv2
 from toadui.base import CachedBgFgElement
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.text import TextDrawer, find_minimum_text_width
-from toadui.helpers.images import blank_image, draw_box_outline
+from toadui.helpers.images import blank_image
+from toadui.helpers.drawing import draw_box_outline
 from toadui.helpers.colors import pick_contrasting_gray_color
 
 # For type hints

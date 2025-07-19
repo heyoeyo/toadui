@@ -10,7 +10,7 @@ import numpy as np
 
 from toadui.base import BaseCallback
 from toadui.helpers.styling import UIStyle, get_background_thickness
-from toadui.helpers.images import draw_box_outline
+from toadui.helpers.drawing import draw_box_outline
 
 # For type hints
 from numpy import ndarray
