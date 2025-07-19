@@ -9,7 +9,7 @@ import cv2
 
 from toadui.base import BaseCallback, CBEventXY, CBRenderSizing
 from toadui.helpers.images import blank_image
-from toadui.helpers.sizing import get_image_hw_to_fit_by_ar, get_image_hw_to_fit_region
+from toadui.helpers.sizing import get_image_hw_to_fit_region
 from toadui.helpers.styling import UIStyle
 
 # For type hints
