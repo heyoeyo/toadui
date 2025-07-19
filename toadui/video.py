@@ -12,7 +12,8 @@ import cv2
 import numpy as np
 
 from toadui.base import BaseCallback
-from toadui.helpers.images import blank_image, get_image_hw_for_max_side_length
+from toadui.helpers.images import blank_image
+from toadui.helpers.sizing import get_image_hw_for_max_side_length
 from toadui.helpers.drawing import draw_box_outline
 from toadui.helpers.video import draw_play_pause_icons
 from toadui.helpers.styling import UIStyle

@@ -10,7 +10,8 @@ import cv2
 from toadui.base import BaseCallback
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.text import TextDrawer
-from toadui.helpers.images import blank_image, get_image_hw_to_fill
+from toadui.helpers.images import blank_image
+from toadui.helpers.sizing import get_image_hw_to_fit_region
 from toadui.helpers.drawing import draw_box_outline
 from toadui.helpers.colors import pick_contrasting_gray_color
 
@@ -53,7 +54,7 @@ class StaticImage(BaseCallback):
         h, w = min(h, self._max_h), min(w, self._max_w)
         img_h, img_w = self._render_image.shape[0:2]
         if self._targ_h != h or self._targ_w != w:
-            fill_h, fill_w = get_image_hw_to_fill(self._cached_img.shape, (h, w))
+            fill_h, fill_w = get_image_hw_to_fit_region(self._cached_img.shape, (h, w))
             self._render_image = cv2.resize(self._cached_img, dsize=(fill_w, fill_h))
             self._targ_h = h
             self._targ_w = w

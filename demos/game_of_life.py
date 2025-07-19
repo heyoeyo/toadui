@@ -20,7 +20,7 @@ from toadui.buttons import ImmediateButton, ToggleButton
 from toadui.text import TextBlock
 from toadui.overlays import DrawMaskOverlay
 from toadui.colormaps import ColormapsBar, make_tree_colormap, load_colormap
-from toadui.helpers.images import get_image_hw_for_max_side_length
+from toadui.helpers.sizing import get_image_hw_for_max_side_length
 from toadui.helpers.loops import TickRateLimiter
 from toadui.helpers.data_management import ValueChangeTracker
 
