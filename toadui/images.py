@@ -13,9 +13,20 @@ from toadui.helpers.sizing import get_image_hw_to_fit_region
 from toadui.helpers.styling import UIStyle
 
 # For type hints
+from typing import NamedTuple
 from numpy import ndarray
 from toadui.helpers.types import HWPX, SelfType
 from toadui.helpers.ocv_types import OCVInterp
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# %% Types
+
+
+class IsLMR(NamedTuple):
+    left: bool
+    middle: bool
+    right: bool
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -45,7 +56,7 @@ class DynamicImage(BaseCallback):
         self._targ_w = -1
 
         # Store state for mouse interaction
-        self._is_clicked = False
+        self._is_lmr_clicked = [False, False, False]
         self._mouse_xy = CBEventXY.default()
 
         # Default to blank square image if given 'None' image input
@@ -76,14 +87,16 @@ class DynamicImage(BaseCallback):
         self._targ_w = -1
         return self
 
-    def read_mouse_xy(self) -> tuple[bool, CBEventXY]:
+    def read_mouse_xy(self) -> tuple[IsLMR, CBEventXY]:
         """
         Read most recent mouse interaction, including whether the mouse was clicked.
+        Note that 'is_lmr_clicked' means 'is left/middle/right clicked'
         Returns:
-            is_clicked, mouse_xy_event
+            is_lmr_clicked, mouse_xy_event
         """
-        is_clicked, self._is_clicked = self._is_clicked, False
-        return is_clicked, self._mouse_xy
+        is_lmr_clicked = IsLMR(*self._is_lmr_clicked)
+        self._is_lmr_clicked = [False, False, False]
+        return is_lmr_clicked, self._mouse_xy
 
     def save(self, save_path: str) -> None:
         """Save current image data to the file system"""
@@ -92,7 +105,17 @@ class DynamicImage(BaseCallback):
     # .................................................................................................................
 
     def _on_left_click(self, cbxy, cbflags) -> None:
-        self._is_clicked = True
+        self._is_lmr_clicked[0] = True
+        self._mouse_xy = cbxy
+        return
+
+    def _on_middle_click(self, cbxy, cbflags) -> None:
+        self._is_lmr_clicked[1] = True
+        self._mouse_xy = cbxy
+        return
+
+    def _on_right_click(self, cbxy, cbflags) -> None:
+        self._is_lmr_clicked[2] = True
         self._mouse_xy = cbxy
         return
 

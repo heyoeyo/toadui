@@ -191,6 +191,7 @@ class DisplayWindow:
                 continue
 
             nice_key_names = []
+            assert not isinstance(key_to_cb_dict, set), f"Got set instead of dict.\n'{desc}': {key_to_cb_dict}"
             assert isinstance(key_to_cb_dict, dict), "Must provide {'description': {'key': callback}} dictionary!"
             for key_code, callback in key_to_cb_dict.items():
 

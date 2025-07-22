@@ -281,8 +281,8 @@ with window.auto_close():
         if is_img_hover:
 
             # Update cells with shape if clicked
-            is_img_clicked, img_mouse_xy = img_elem.read_mouse_xy()
-            if is_img_clicked:
+            is_lmr_clicked, img_mouse_xy = img_elem.read_mouse_xy()
+            if is_lmr_clicked.left:
                 life.place_pattern(curr_pattern, img_mouse_xy.xy_norm, use_xor=True, clear_existing=False)
 
             # Draw mask indicator to show placement of selected pattern

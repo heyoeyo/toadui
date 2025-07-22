@@ -70,7 +70,6 @@ window.attach_keypress_callbacks(
         "Step video backwards/forwards": {KEY.L_ARROW: vreader.prev_frame, KEY.R_ARROW: vreader.next_frame},
     }
 )
-
 window.report_keypress_descriptions()
 
 with window.auto_close(vreader.release):
@@ -80,11 +79,11 @@ with window.auto_close(vreader.release):
 
         # Display mouse coordinates when user hovers the image & draw circle with outline
         if img_elem.is_hovered():
-            is_clicked, evt = img_elem.read_mouse_xy()
+            _, evt = img_elem.read_mouse_xy()
             xynorm_block.set_text(f"({evt.xy_norm.x:.2f}, {evt.xy_norm.y:.2f})")
             xypx_block.set_text(f"({evt.xy_px.x}, {evt.xy_px.y})")
-            frame = draw_circle_norm(frame, evt.xy_norm, radius_px=5)
             frame = draw_circle_norm(frame.copy(), evt.xy_norm, radius_px=6, color=(0, 0, 0), thickness=1)
+            frame = draw_circle_norm(frame, evt.xy_norm, radius_px=5)
 
         # Update displayed image & render
         img_elem.set_image(frame)

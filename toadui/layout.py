@@ -784,6 +784,9 @@ class OverlayStack(BaseCallback):
 
     # .................................................................................................................
 
+    def _get_dynamic_aspect_ratio(self):
+        return self._base_item._get_dynamic_aspect_ratio()
+
     def _get_height_and_width_without_hint(self) -> HWPX:
         return self._base_item._get_height_and_width_without_hint()
 
