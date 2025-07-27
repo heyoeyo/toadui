@@ -5,8 +5,11 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
+import cv2
+
 # For type hints
 from toadui.helpers.types import IMGSHAPE_HW, HWPX
+from numpy import ndarray
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -15,6 +18,34 @@ from toadui.helpers.types import IMGSHAPE_HW, HWPX
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Functions
+
+
+def resize_hw(frame: ndarray, hw: HWPX, interpolation=None) -> ndarray:
+    """Alternate version of cv2.resize(...) which takes (height, width) instead of (width, height) for sizing"""
+    return cv2.resize(frame, dsize=(hw[1], hw[0]), interpolation=interpolation)
+
+
+def get_image_hw_to_fit_by_ar(aspect_ratio: float, region_hw: IMGSHAPE_HW, fit_within=True) -> HWPX:
+    """
+    Helper used to find the sizing (height & width) to fit into/or
+    around a given target height & width, based on an aspect ratio.
+    For example, for an aspect ratio of 1.5 (e.g. width = 1.5 * height):
+        get_image_hw_to_fit_by_ar(1.5, (600,400), fit_within=True) -> (267, 400)
+        get_image_hw_to_fit_by_ar(1.5, (600,400), fit_within=False) -> (600, 900)
+
+    -> So 267x400 fits 'within' the 600x400 region
+    -> While 600x900 fits 'around' the region
+
+    Returns:
+        output_height, output_width
+    """
+    reg_h, reg_w = region_hw[0:2]
+
+    min_or_max = min if fit_within else max
+    out_h = min_or_max(reg_h, reg_w / aspect_ratio)
+    out_w = min_or_max(reg_w, reg_h * aspect_ratio)
+
+    return round(out_h), round(out_w)
 
 
 def get_image_hw_to_fit_region(image_shape: IMGSHAPE_HW, region_hw: IMGSHAPE_HW, fit_within=True) -> HWPX:

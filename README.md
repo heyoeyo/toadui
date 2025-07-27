@@ -6,6 +6,8 @@ ToadUI is a helper UI library built on top of the basic UI provided by [OpenCV](
   <img src="https://github.com/user-attachments/assets/285c9cfa-1a4e-4347-bb1f-1b8bf4a1a242">
 </p>
 
+Check out the [demos](https://github.com/heyoeyo/toadui/tree/main/demos) to see what can be done with ToadUI.
+
 > [!IMPORTANT]
 > This library is still in early development
 

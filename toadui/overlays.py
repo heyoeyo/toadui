@@ -8,19 +8,95 @@
 import cv2
 import numpy as np
 
-from toadui.base import BaseCallback, BaseOverlay, CBEventXY
+from toadui.base import BaseCallback, BaseOverlay, CBEventXY, CBEventFlags
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.drawing import draw_normalized_polygon
 from toadui.helpers.text import TextDrawer
 
 # Typing
+from typing import NamedTuple
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, XYPX, XYNORM, HWPX, XY1XY2NORM, SelfType
 from toadui.helpers.ocv_types import OCVInterp, OCVLineType, OCVFont
 
 
 # ---------------------------------------------------------------------------------------------------------------------
+# %% Types
+
+
+class CBEventAndFlags(NamedTuple):
+    event: CBEventXY
+    flags: CBEventFlags
+
+
+# ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
+
+
+class DrawRectangleOverlay(BaseOverlay):
+    """Simple overlay which draws a rectangle over top of base images"""
+
+    def __init__(
+        self,
+        base_item: BaseCallback,
+        color: COLORU8 = (0, 255, 255),
+        bg_color: COLORU8 | None = None,
+        thickness: int = 2,
+        max_rectangles: int = 12,
+    ):
+        self._rectangle_xy1xy2_norm_list: list[XY1XY2NORM] = []
+        self.style = UIStyle(
+            color_fg=color,
+            color_bg=bg_color,
+            thickness_fg=thickness,
+            thickness_bg=thickness + 1,
+        )
+        super().__init__(base_item)
+
+    # .................................................................................................................
+
+    def clear(self) -> SelfType:
+        self._poly_xy_norm_list = []
+        return self
+
+    # .................................................................................................................
+
+    def set_rectangles(self, *rectangle_xy1xy2_norm_list: list[XY1XY2NORM]) -> SelfType:
+        """
+        Set or replace polygons. Polygons should be given as either a list/tuple
+        of normalized xy coordinates or as an Nx2 numpy array, where N is the
+        number of points in the polygon. More than one polygon can be provided.
+
+        For example:
+            poly1 = np.float32([(0.25,0.25), (0.75, 0.25), (0.75, 0.75), (0.25, 0.75)])
+            poly2 = [(0.25, 0.25), (0.85, 0.5), (0.25, 0.5)]
+            set_polygons(poly1, poly2)
+        """
+
+        self._rectangle_xy1xy2_norm_list = tuple(*rectangle_xy1xy2_norm_list)
+
+        return self
+
+    # .................................................................................................................
+
+    def _render_overlay(self, frame: ndarray) -> ndarray:
+
+        if len(self._rectangle_xy1xy2_norm_list) == 0:
+            return frame
+
+        out_frame = frame.copy()
+        xscale = out_frame.shape[1] - 1
+        yscale = out_frame.shape[0] - 1
+        xy1_norm, xy2_norm = self._rectangle_xy1xy2_norm_list
+        xy1_px = tuple((round(xy1_norm[0] * xscale), round(xy1_norm[1] * yscale)))
+        xy2_px = tuple((round(xy2_norm[0] * xscale), round(xy2_norm[1] * yscale)))
+        if self.style.color_bg is not None:
+            cv2.rectangle(out_frame, xy1_px, xy2_px, self.style.color_bg, self.style.thickness_bg, cv2.LINE_4)
+        cv2.rectangle(out_frame, xy1_px, xy2_px, self.style.color_fg, self.style.thickness_bg, cv2.LINE_4)
+
+        return out_frame
+
+    # .................................................................................................................
 
 
 class DrawPolygonsOverlay(BaseOverlay):
@@ -295,7 +371,7 @@ class PointClickOverlay(BaseOverlay):
 
     # .................................................................................................................
 
-    def _on_left_click(self, cbxy: CBEventXY, cbflags) -> None:
+    def _on_left_click(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
 
         # Add point if shift clicked or update point otherwise
         new_xy_norm = cbxy.xy_norm
@@ -311,7 +387,7 @@ class PointClickOverlay(BaseOverlay):
 
         return
 
-    def _on_right_click(self, cbxy: CBEventXY, cbflags) -> None:
+    def _on_right_click(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
         self.remove_closest(cbxy.xy_norm, cbxy.hw_px)
         return
 
@@ -460,7 +536,7 @@ class BoxSelectOverlay(BaseOverlay):
 
     # .................................................................................................................
 
-    def _on_left_down(self, cbxy: CBEventXY, cbflags):
+    def _on_left_down(self, cbxy: CBEventXY, cbflags: CBEventFlags):
 
         # Ignore clicks outside of region
         if not cbxy.is_in_region:
@@ -478,7 +554,7 @@ class BoxSelectOverlay(BaseOverlay):
 
         return
 
-    def _on_drag(self, cbxy: CBEventXY, cbflags):
+    def _on_drag(self, cbxy: CBEventXY, cbflags: CBEventFlags):
 
         # Update second in-progress box point
         if self._xy1xy2_norm_inprog is not None:
@@ -488,7 +564,7 @@ class BoxSelectOverlay(BaseOverlay):
 
         return
 
-    def _on_left_up(self, cbxy: CBEventXY, cbflags):
+    def _on_left_up(self, cbxy: CBEventXY, cbflags: CBEventFlags):
 
         is_valid, new_tlbr = self._make_inprog_tlbr()
         if is_valid:
@@ -498,7 +574,7 @@ class BoxSelectOverlay(BaseOverlay):
 
         return
 
-    def _on_right_click(self, cbxy: CBEventXY, cbflags):
+    def _on_right_click(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         self.remove_closest(cbxy.xy_norm, cbxy.hw_px)
         return
 
@@ -613,22 +689,22 @@ class EditBoxOverlay(BaseOverlay):
     def __init__(
         self,
         base_item: BaseCallback,
-        frame_shape=None,
         color: COLORU8 = (0, 255, 255),
-        thickness: int = 1,
+        thickness: int = 2,
         bg_color: COLORU8 | None = (0, 0, 0),
-        indicator_base_radius: int = 6,
-        interaction_distance_px: float = 100,
+        indicator_radius: int = 3,
+        interaction_distance_px: float = 50,
         minimum_box_area_norm: float = 5e-5,
+        frame_shape: HWPX | None = None,
     ):
         # Inherit from parent
         super().__init__(base_item)
 
         # Store box points in format that supports 'mid points'
-        self._x_norms = np.float32([0.0, 0.5, 1.0])
-        self._y_norms = np.float32([0.0, 0.5, 1.0])
+        self._x_norms = np.float32([0.2, 0.5, 0.8])
+        self._y_norms = np.float32([0.2, 0.5, 0.8])
         self._prev_xy_norms = (self._x_norms, self._y_norms)
-        self._is_changed = False
+        self._is_changed = True
 
         # Store indexing used to specify which of the box points is being modified, if any
         self._is_modifying = False
@@ -636,40 +712,21 @@ class EditBoxOverlay(BaseOverlay):
         self._mouse_xy_norm = (0.0, 0.0)
 
         # Store sizing of frame being cropped, only use when 'nudging' the crop box
-        self._full_frame_hw = frame_shape[0:2] if frame_shape is not None else (100, 100)
+        self._frame_shape = None if frame_shape is None else frame_shape[0:2]
 
         # Store thresholding settings
         self._minimum_area_norm = minimum_box_area_norm
         self._interact_dist_px_threshold = interaction_distance_px
 
-        # Store display config
-        self._fg_color = color
-        self._bg_color = bg_color
-        self._fg_thick = thickness
-        self._bg_thick = thickness + 1
-        self._ltype = cv2.LINE_4
-        self._ind_base_radius = indicator_base_radius
-        self._ind_fg_radius = self._ind_base_radius + self._fg_thick
-        self._ind_bg_radius = self._ind_fg_radius + (self._bg_thick - self._fg_thick)
-        self._ind_ltype = cv2.LINE_AA
-
-    # .................................................................................................................
-
-    def style(self, color=None, thickness=None, bg_color=None, bg_thickness=None) -> SelfType:
-        """Update box styling. Any settings given as None will remain unchanged"""
-
-        if color is not None:
-            self._fg_color = color
-        if thickness is not None:
-            self._fg_thick = thickness
-            self._ind_fg_radius = self._ind_base_radius + self._fg_thick
-        if bg_color is not None:
-            self._bg_color = bg_color if bg_color != -1 else None
-        if bg_thickness is not None:
-            self._bg_thick = bg_thickness
-            self._ind_bg_radius = self._ind_fg_radius + (self._bg_thick - self._fg_thick)
-
-        return self
+        self.style = UIStyle(
+            color_fg=color,
+            color_bg=bg_color,
+            thickness_fg=thickness,
+            thickness_bg=thickness + 1,
+            indicator_radius_fg=indicator_radius + thickness,
+            indicator_radius_bg=indicator_radius + thickness + 1,
+            line_type=cv2.LINE_AA,
+        )
 
     # .................................................................................................................
 
@@ -721,19 +778,28 @@ class EditBoxOverlay(BaseOverlay):
 
         return self
 
+    def set_frame_shape(self, frame_shape: HWPX | None) -> SelfType:
+        """Update internal frame sizing. Used to properly 'nudge' by 1 pixel"""
+        self._frame_shape = frame_shape
+        return self
+
     # .................................................................................................................
 
-    def nudge(self, left: int = 0, right: int = 0, up: int = 0, down: int = 0) -> SelfType:
+    def nudge(
+        self, left: int = 0, right: int = 0, up: int = 0, down: int = 0, frame_shape: HWPX | None = None
+    ) -> SelfType:
         """Helper used to move the position of a point (nearest to the mouse) by some number of pixels"""
 
         # Figure out which point to nudge
-        (x_idx, y_idx), _, _ = self._check_xy_interaction(self._mouse_xy_norm, self._full_frame_hw)
+        frame_shape = self._frame_shape if frame_shape is None else frame_shape
+        frame_hw = frame_shape[0:2] if frame_shape is not None else self._base_item.get_render_hw()
+        (x_idx, y_idx), _, _ = self._check_xy_interaction(self._mouse_xy_norm, frame_hw)
 
         # Handle left/right nudge
         is_leftright_nudgable = x_idx != 1
         leftright_nudge = right - left
         if is_leftright_nudgable and leftright_nudge != 0:
-            _, w_px = self._full_frame_hw
+            _, w_px = frame_hw
             old_x_norm = self._x_norms[x_idx]
             old_x_px = old_x_norm * (w_px - 1)
             new_x_px = old_x_px + leftright_nudge
@@ -748,7 +814,7 @@ class EditBoxOverlay(BaseOverlay):
         is_updown_nudgable = y_idx != 1
         updown_nudge = down - up
         if is_updown_nudgable and updown_nudge != 0:
-            h_px, _ = self._full_frame_hw
+            h_px, _ = frame_hw
             old_y_norm = self._y_norms[y_idx]
             old_y_px = old_y_norm * (h_px - 1)
             new_y_px = old_y_px + updown_nudge
@@ -766,12 +832,12 @@ class EditBoxOverlay(BaseOverlay):
 
     # .................................................................................................................
 
-    def _on_move(self, cbxy: CBEventXY, cbflags):
+    def _on_move(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         # Record mouse position for rendering 'closest point' indicator on hover
         self._mouse_xy_norm = cbxy.xy_norm
         return
 
-    def _on_left_down(self, cbxy: CBEventXY, cbflags):
+    def _on_left_down(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         """Create a new box or modify exist box based on left-click position"""
 
         # Ignore clicks outside of region
@@ -799,7 +865,7 @@ class EditBoxOverlay(BaseOverlay):
 
         return
 
-    def _on_drag(self, cbxy: CBEventXY, cbflags):
+    def _on_drag(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         """Modify box corner or midpoint when dragging"""
 
         # Bail if no points are being modified (shouldn't happen...?)
@@ -823,7 +889,7 @@ class EditBoxOverlay(BaseOverlay):
 
         return
 
-    def _on_left_up(self, cbxy: CBEventXY, cbflags):
+    def _on_left_up(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         """Stop modifying box on left up"""
 
         # Reset modifier indexing
@@ -840,7 +906,7 @@ class EditBoxOverlay(BaseOverlay):
 
         return
 
-    def _on_right_click(self, cbxy: CBEventXY, cbflags):
+    def _on_right_click(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         self.clear()
         return
 
@@ -920,15 +986,19 @@ class EditBoxOverlay(BaseOverlay):
         closest_xy_px = (close_x_px, close_y_px)
 
         # Draw all background coloring first, so it appears entirely 'behind' the foreground
-        if self._bg_color is not None:
+        if self.style.color_bg is not None:
             if need_draw_indicator:
-                cv2.circle(frame, closest_xy_px, self._ind_bg_radius, self._bg_color, -1, self._ind_ltype)
-            cv2.rectangle(frame, xy1_px, xy2_px, self._bg_color, self._bg_thick, self._ltype)
+                cv2.circle(
+                    frame, closest_xy_px, self.style.indicator_radius_bg, self.style.color_bg, -1, self.style.line_type
+                )
+            cv2.rectangle(frame, xy1_px, xy2_px, self.style.color_bg, self.style.thickness_bg, cv2.LINE_4)
 
         # Draw box + interaction indicator circle in foreground color
         if need_draw_indicator:
-            cv2.circle(frame, closest_xy_px, self._ind_fg_radius, self._fg_color, -1, self._ind_ltype)
-        cv2.rectangle(frame, xy1_px, xy2_px, self._fg_color, self._fg_thick, self._ltype)
+            cv2.circle(
+                frame, closest_xy_px, self.style.indicator_radius_fg, self.style.color_fg, -1, self.style.line_type
+            )
+        cv2.rectangle(frame, xy1_px, xy2_px, self.style.color_fg, self.style.thickness_fg, cv2.LINE_4)
 
         return frame
 

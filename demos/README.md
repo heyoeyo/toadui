@@ -12,6 +12,13 @@ There's a built-in heatmap feature, implemented using colormapping, which colors
 
 **UI Elements:** ColormapsBar, TextCarousel, ImmediateButton, ToggleButton, Slider
 
+## image_cropping.py
+
+This demo runs a simple UI for cropping images or frames from videos.
+
+The UI includes support for interactive click-and-drag boxes. The built-in [selectROI](https://docs.opencv.org/4.x/d7/dfc/group__highgui.html#ga99cbbe0e7ed2e099e52c367ea4306be4) from Opencv, provides similar functionality, but locks up the display while doing so. The ToadUI implementation allows for continuous rendering/UI updates as well as interactively modifiying the box after-the-fact.
+
+**UI Elements:** FixedARImage, ZoomImage, Swapper, ToggleImageButton, EditBoxOverlay, DrawRectangleOverlay, VideoPlaybackSlider, PrefixedTextBlock
 
 ## video_playback.py
 

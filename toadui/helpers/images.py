@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
+from dataclasses import dataclass
 from base64 import b64decode, b64encode
 
 import cv2
@@ -13,11 +14,71 @@ import numpy as np
 # For type hints
 from typing import Iterable
 from numpy import ndarray
-from toadui.helpers.types import COLORU8, IMGSHAPE_HW
+from toadui.helpers.types import COLORU8, IMGSHAPE_HW, XYNORM, XYPX, XY1XY2PX
 
 
 # ---------------------------------------------------------------------------------------------------------------------
-# %% Classes
+# %% Types
+
+
+@dataclass
+class CropData:
+    """
+    Container data used to hold information used to crop an image,
+    along with some convenience functions.
+    """
+
+    x1: int
+    y1: int
+    x2: int
+    y2: int
+
+    def crop(self, frame: ndarray) -> ndarray:
+        return frame[self.y1 : self.y2, self.x1 : self.x2]
+
+    @property
+    def xy1(self) -> tuple[int, int]:
+        return (self.x1, self.y1)
+
+    @property
+    def xy2(self) -> tuple[int, int]:
+        return (self.x2, self.y2)
+
+    @property
+    def xy1xy2(self) -> XY1XY2PX:
+        return ((self.x1, self.y1), (self.x2, self.y2))
+
+    def get_yx_slices(self) -> tuple[slice, slice]:
+        """
+        Get x/y indexing slices for cropping
+        For example:
+            y_slice, x_slice = crop_data.get_xy_slices()
+            crop_img = image[y_slice, x_slice]
+        """
+        return slice(self.y1, self.y2), slice(self.x1, self.x2)
+
+    @classmethod
+    def from_xy1_xy2_norm(cls, image_shape: IMGSHAPE_HW, xy1_norm: XYNORM, xy2_norm: XYNORM):
+        """
+        Create crop data from normalized xy1 & xy2 coordinates (and a frame shape)
+        Returns:
+            new CropData
+        """
+
+        # For convenience
+        img_h, img_w = image_shape[0:2]
+        x_scale = img_w - 1
+        y_scale = img_h - 1
+
+        # Compute crop coords
+        xy1_px = (round(xy1_norm[0] * x_scale), round(xy1_norm[1] * y_scale))
+        xy2_px = (round(xy2_norm[0] * x_scale), round(xy2_norm[1] * y_scale))
+
+        return cls(*xy1_px, *xy2_px)
+
+    def is_valid(self) -> bool:
+        """Check if crop data would produce a valid (e.g. non-empty) crop result"""
+        return (self.x2 > self.x1) and (self.y2 > self.y1) and (self.x1 >= 0) and (self.y1 >= 0)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -106,6 +167,31 @@ def dirty_blur(
     ygrid += np.sin(ang_grid) * rad_grid
 
     return cv2.remap(image_uint8, xgrid, ygrid, interpolation, borderMode=border_mode)
+
+
+def convert_xy_norm_to_px(image_shape: IMGSHAPE_HW, *xy_norm_coords: XYNORM) -> tuple[XYPX] | XYPX:
+    """
+    Helper used to convert normalized xy coordinates to pixel coordinates,
+    based on the provided image shape.
+
+    Note that any number of input xy coordinates can be given, and the
+    same number of coordinates will be returned by the function as a tuple.
+    However, if a single xy coord is provided, then the function will output
+    the converted coordinate directly (as opposed to a tuple of 1 xy coord).
+
+    Returns:
+        *xy_px_coords
+    """
+
+    # For convenience
+    img_h, img_w = image_shape[0:2]
+    x_scale = img_w - 1
+    y_scale = img_h - 1
+
+    # Compute crop coords
+    xy_px_list = tuple((round(x * x_scale), round(y * y_scale)) for x, y in xy_norm_coords)
+
+    return xy_px_list if len(xy_px_list) > 1 else xy_px_list[0]
 
 
 def histogram_equalization(

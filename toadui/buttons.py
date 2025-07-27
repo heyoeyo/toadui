@@ -14,10 +14,12 @@ from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline, draw_drop_shadow, draw_rectangle_norm
 from toadui.helpers.colors import adjust_as_hsv, pick_contrasting_gray_color, lerp_colors
 from toadui.helpers.styling import UIStyle
+from toadui.helpers.sizing import get_image_hw_to_fit_region, resize_hw
 
 # For type hints
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType
+from toadui.helpers.ocv_types import OCVInterp
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -154,6 +156,103 @@ class ToggleButton(BaseCallback):
         return btn_img
 
     # .................................................................................................................
+
+
+class ToggleImageButton(BaseCallback):
+
+    def __init__(
+        self,
+        default_image: ndarray,
+        toggle_image: ndarray | None = None,
+        default_state: bool = False,
+        include_box_outline: bool = True,
+        resize_interpolation: OCVInterp = cv2.INTER_AREA,
+        height: int = 40,
+        minimum_width: int = 40,
+        is_flexible_h: bool = False,
+        is_flexible_w: bool = True,
+    ):
+
+        # Fill in missing image data, if needed
+        if default_image.ndim < 3:
+            default_image = cv2.cvtColor(default_image, cv2.COLOR_GRAY2BGR)
+        if toggle_image is None:
+            toggle_image = default_image
+
+        # Storage for cached data
+        self._default_ar = default_image.shape[1] / default_image.shape[0]
+        self._off_img = toggle_image if default_state else default_image
+        self._on_img = default_image if default_state else toggle_image
+        self._cached_off_img = blank_image(1, 1)
+        self._cached_on_img = blank_image(1, 1)
+
+        # Storage for toggle state
+        self._is_on = default_state
+        self._is_changed = True
+
+        # Set up element styling
+        self.style = UIStyle(
+            outline_color=(0, 0, 0) if include_box_outline else None,
+            outline_hover_color=(255, 255, 255) if include_box_outline else None,
+            resize_interpolation=resize_interpolation,
+        )
+
+        # Inherit from parent
+        super().__init__(height, minimum_width, is_flexible_h, is_flexible_w)
+
+    # .................................................................................................................
+
+    def read(self) -> tuple[bool, bool]:
+        """Returns: is_changed, current_state"""
+        is_changed = self._is_changed
+        self._is_changed = False
+        return is_changed, self._is_on
+
+    def toggle(self, new_state: bool | None = None) -> bool:
+        """Toggle current state (or set to True/False if given an input). Returns: new_state"""
+        old_state = self._is_on
+        self._is_on = not self._is_on if new_state is None else new_state
+        if old_state != self._is_on:
+            self._is_changed = True
+        return self._is_on
+
+    def set_is_changed(self, is_changed: bool = True) -> SelfType:
+        """Artificially set change state"""
+        self._is_changed = is_changed
+        return self
+
+    # .................................................................................................................
+
+    def _on_left_click(self, cbxy, cbflags) -> None:
+        self.toggle()
+
+    # .................................................................................................................
+
+    def _get_dynamic_aspect_ratio(self):
+        if self._cb_rdr.is_flexible_h and self._cb_rdr.is_flexible_w:
+            return self._default_ar
+        return None
+
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+
+        # Re-draw on/off button states if size changes
+        if h != self._cached_on_img.shape[0] or w != self._cached_on_img.shape[1]:
+
+            off_hw = get_image_hw_to_fit_region(self._off_img.shape, (h, w))
+            on_hw = get_image_hw_to_fit_region(self._on_img.shape, (h, w))
+            off_img = resize_hw(self._off_img, off_hw, self.style.resize_interpolation)
+            on_img = resize_hw(self._on_img, on_hw, self.style.resize_interpolation)
+
+            # Store images for re-use
+            self._cached_off_img = draw_box_outline(off_img, self.style.outline_color)
+            self._cached_on_img = draw_box_outline(on_img, self.style.outline_color)
+
+        # Draw button label
+        btn_img = self._cached_on_img if self._is_on else self._cached_off_img
+        if self.is_hovered():
+            btn_img = draw_box_outline(btn_img.copy(), self.style.outline_hover_color)
+
+        return btn_img
 
 
 class ImmediateButton(BaseCallback):
