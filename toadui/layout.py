@@ -799,6 +799,64 @@ class OverlayStack(BaseCallback):
     # .................................................................................................................
 
 
+class Swapper(BaseCallback):
+    """
+    Special layout item which allows for swapping between elements.
+    This can be used to switch between different UI layouts, for example.
+    """
+
+    # .................................................................................................................
+
+    def __init__(self, *swap_items: BaseCallback, initial_index: int = 0):
+
+        self._items: tuple[BaseCallback] = tuple(swap_items)
+        self._swap_idx: int = initial_index
+        self._num_items: int = len(self._items)
+
+        tallest_child_min_h = max(child._cb_rdr.min_h for child in self._items)
+        widest_child_min_w = max(child._cb_rdr.min_w for child in self._items)
+        is_flex_h = any(child._cb_rdr.is_flexible_h for child in self._items)
+        is_flex_w = any(child._cb_rdr.is_flexible_w for child in self._items)
+
+        super().__init__(tallest_child_min_h, widest_child_min_w, is_flex_h, is_flex_w)
+
+    def set_swap_index(self, swap_index: int):
+        if 0 <= swap_index < self._num_items:
+            self._swap_idx = swap_index
+        return self
+
+    def next(self, increment=1):
+        self._swap_idx = (self._swap_idx + increment) % self._num_items
+        return self
+
+    def prev(self, decrement=1):
+        return self.next(-decrement)
+
+    def _render_up_to_size(self, h, w):
+        return self._items[self._swap_idx]._render_up_to_size(h, w)
+
+    def _get_dynamic_aspect_ratio(self):
+        return self._items[self._swap_idx]._get_dynamic_aspect_ratio()
+
+    def _get_height_and_width_without_hint(self):
+        return self._items[self._swap_idx]._get_height_and_width_without_hint()
+
+    def _get_height_given_width(self, w):
+        return self._items[self._swap_idx]._get_height_given_width(w)
+
+    def _get_width_given_height(self, h):
+        return self._items[self._swap_idx]._get_width_given_height(h)
+
+    def _cb_iter(self, global_x_px: int, global_y_px: int):
+        if not self._cb_state.disabled:
+            child = self._items[self._swap_idx]
+            if not child._cb_state.disabled:
+                yield from child._cb_iter(global_x_px, global_y_px)
+        return
+
+    # .................................................................................................................
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Functions
 
