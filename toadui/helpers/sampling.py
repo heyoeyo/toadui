@@ -168,12 +168,52 @@ def sdf_circle(mesh_xy: ndarray, xy_center: tuple[float, float], radius: float) 
     - The mesh_xy is expected to be a HxWx2 array, containing xy coordinate values
     - Units for the center/radius are based on the provided xy mesh
     - This does not 'draw' a circle into an image, it only computes the sdf
+    -> A simple way to 'draw' the result is as follows:
+        image_of_circle = np.uint8(sdf_circle(...) < 0) * 255
 
     Returns:
         sdf_of_circle
     """
 
     return np.linalg.norm(mesh_xy - np.float32(xy_center), ord=2, axis=2) - radius
+
+
+def sdf_rectangle(mesh_xy: ndarray, xy_center: tuple[float, float], wh: tuple[float, float]) -> ndarray:
+    """
+    Helper used to calculate the signed-distance-function (DSF) for a rectangle.
+    This can be used to draw 'perfect' rectangular of arbitrary units,
+    (most notably, they do not need to be perfectly pixel-aligned), and
+    can be used to draw boxes with rounded corners, for example.
+    Note that the xy_center and width/height (wh) values should be
+    given in units matching the mesh_xy input.
+
+    For an explanation, see:
+    https://youtu.be/62-pRVZuS5c?si=9f3Iz6DOk2xoVpfH
+
+    Returns:
+        sdf_of_rectangle
+    """
+
+    xy_delta = np.abs(mesh_xy - np.float32(xy_center)) - np.float32(wh) * 0.5
+    return np.linalg.norm(np.maximum(xy_delta, 0), ord=2, axis=2) + np.minimum(xy_delta.max(axis=2), 0)
+
+
+def sdf_line_segment(mesh_xy: ndarray, point_a_xy: tuple[float, float], point_b_xy: tuple[float, float]) -> ndarray:
+    """
+    Helper used to calculate the signed-distance-function for a line segment.
+    Note that the point_a and point_b xy coordinates should be given in
+    units matching the mesh_xy input.
+
+    For an explanation of this, see:
+    https://youtu.be/PMltMdi1Wzg?si=d5PR-7pBYkxZYcIU
+
+    Returns:
+        sdf_of_line_segment
+    """
+    delta_a = mesh_xy - np.float32(point_a_xy)
+    delta_ba = np.float32(point_b_xy) - np.float32(point_a_xy)
+    dist_from_a = np.clip(np.dot(delta_a, delta_ba) / np.dot(delta_ba, delta_ba), 0.0, 1.0)
+    return np.linalg.norm(delta_a - (delta_ba * np.expand_dims(dist_from_a, 2)), ord=2, axis=2)
 
 
 def smoothstep(edge0: float, edge1: float, x: ndarray | float) -> ndarray | float:

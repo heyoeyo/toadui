@@ -15,7 +15,7 @@ from toadui.base import BaseCallback
 from toadui.helpers.images import blank_image
 from toadui.helpers.sizing import get_image_hw_for_max_side_length
 from toadui.helpers.drawing import draw_box_outline
-from toadui.helpers.video import draw_play_pause_icons
+from toadui.helpers.icons import draw_play_pause_icons
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import pick_contrasting_gray_color, lerp_colors
 from toadui.patterns.truchet import draw_truchet, make_dot_tiles
@@ -319,8 +319,12 @@ class ImageAsVideoReader(PauseableVideoReader):
         """Do nothing"""
         return self
 
-    def toggle_pause(self) -> bool:
-        """Do nothing. Returns: is_paused (always False)"""
+    def toggle_pause(self, new_pause_state: bool | None = None) -> bool:
+        """
+        Toggle pause state. This has no effect on the image source, but will alter
+        the reported value when reading frames. Returns: is_paused
+        """
+        self._is_paused = (not self._is_paused) if new_pause_state is None else new_pause_state
         return self._is_paused
 
     def read(self) -> [bool, int, ndarray]:
@@ -338,12 +342,13 @@ class ImageAsVideoReader(PauseableVideoReader):
     def prev_frame(self, num_frames=1) -> SelfType:
         return self.next_frame(-num_frames)
 
-    def get_pause_state(self) -> bool:
-        return self._is_paused
-
     def get_sample_frame(self) -> ndarray:
         """Retrieve a copy of the original image (without scaling)"""
         return self.sample_frame.copy()
+
+    def get_pause_state(self) -> bool:
+        """Returns: is_paused"""
+        return self._is_paused
 
     # .................................................................................................................
 
@@ -725,9 +730,10 @@ class VideoPlaybackSlider(BaseCallback):
             if self._include_button:
                 # Draw button components
                 btn_side_length = min(h, w)
-                btn_hw = (btn_side_length, btn_side_length)
                 tri_img, dblbar_img = draw_play_pause_icons(
-                    btn_hw, self.style.button.color, self.style.button.color_symbol
+                    self.style.button.color,
+                    self.style.button.color_symbol,
+                    side_length_px=btn_side_length,
                 )
 
                 # Combine button & slider into a single image
