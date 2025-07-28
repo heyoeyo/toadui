@@ -886,6 +886,7 @@ def read_webcam_string(input_source: str | int | None):
 def ask_for_video_path(
     video_path: str | None = None,
     default_path: str | None = None,
+    path_type="video",
     allow_webcam_inputs: bool = False,
     quit_on_keyboard_interupt: bool = True,
 ) -> str:
@@ -893,7 +894,7 @@ def ask_for_video_path(
     return ask_for_path_if_missing(
         video_path,
         default_path,
-        path_type="video",
+        path_type=path_type,
         allow_files=True,
         allow_folders=False,
         special_case_check=check_for_cam if allow_webcam_inputs else None,

@@ -8,6 +8,8 @@
 import os
 from pathlib import Path
 
+from typing import Iterable
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -99,3 +101,42 @@ def simplify_path(
         out_path = os.path.join(*reversed(new_parts))
 
     return out_path if is_input_str else Path(out_path)
+
+
+def make_webcam_path(
+    path: str | int,
+    folder_path: str | Iterable[str] = "~",
+    base_name: str = "toadui_cam",
+    file_ext: str = ".mp4",
+) -> str:
+    """
+    Helper used to construct 'fake' file paths for webcam inputs,
+    so that they can be treated the same as video file paths by
+    applications that accept either input type.
+    This is particularly helpful when generating saving paths
+    from an input file.
+
+    The parent folder path can be provided directly, or as
+    a list of folder names (e.g. [~, "Desktop", "Files"]), which
+    will be joined together: "/home/user/Desktop/Files/"
+
+    Returns:
+        fake_webcam_file_path
+    """
+
+    # Convert string input paths to integer-only
+    if isinstance(path, str):
+        int_only_str = "".join([char for char in path if str(char).isdigit()])
+        path = int(int_only_str) if len(int_only_str) > 0 else 0
+
+    # Join multi-folder path inputs
+    if isinstance(folder_path, Iterable):
+        folder_path = os.path.join(*folder_path)
+
+    # Make sure extension includes the dot!
+    if not file_ext.startswith(".") and len(file_ext) > 0:
+        file_ext = f".{file_ext}"
+
+    # Build output path
+    out_path = os.path.join(folder_path, f"{base_name}{path}{file_ext}")
+    return os.path.expanduser(out_path)

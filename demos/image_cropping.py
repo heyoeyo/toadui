@@ -10,7 +10,7 @@ import argparse
 import cv2
 
 from toadui.window import DisplayWindow, KEY
-from toadui.video import VideoPlaybackSlider, ask_for_path_if_missing, load_looping_video_or_image
+from toadui.video import VideoPlaybackSlider, ask_for_video_path, load_looping_video_or_image, read_webcam_string
 from toadui.images import DynamicImage, FixedARImage, ZoomImage
 from toadui.text import PrefixedTextBlock
 from toadui.layout import VStack, HStack, Swapper
@@ -20,7 +20,7 @@ from toadui.sliders import Slider
 from toadui.overlays import EditBoxOverlay, DrawRectangleOverlay
 from toadui.helpers.images import CropData
 from toadui.helpers.icons import draw_lock_icons
-from toadui.helpers.pathing import modify_file_path, simplify_path
+from toadui.helpers.pathing import modify_file_path, simplify_path, make_webcam_path
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -31,8 +31,8 @@ default_input_path = None
 default_display_size = 800
 
 # Define script arguments
-parser = argparse.ArgumentParser(description="Demo of controllable video playback")
-parser.add_argument("-i", "--input_path", default=default_input_path, type=str, help="Path to video")
+parser = argparse.ArgumentParser(description="Demo for cropping images or frames from a video")
+parser.add_argument("-i", "--input_path", default=default_input_path, type=str, help="Path to video or image")
 parser.add_argument("-d", "--display_size", default=default_display_size, type=int, help="Initial window size")
 parser.add_argument("-cam", "--use_webcam", action="store_true", help="Use webcam as video source")
 
@@ -45,14 +45,20 @@ display_size = args.display_size
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Setup UI elements
 
-# Handle video vs. image inputs
-input_path = ask_for_path_if_missing(input_path, path_type="image or video")
+# Handle video vs. image vs. webcam inputs
+input_path = ask_for_video_path(input_path, path_type="image or video", allow_webcam_inputs=True)
+is_webcam_source, input_path = read_webcam_string(input_path)
 is_image_source, vreader = load_looping_video_or_image(input_path)
 sample_frame = vreader.get_sample_frame()
 
+# Make fake file input when dealing with webcams (to allow for saving results)
+if is_webcam_source:
+    input_path = make_webcam_path(input_path, base_name="toadui_crop_cam")
+
 # Define UI elements
 playback_slider = VideoPlaybackSlider(vreader)
-show_playback_bar = not is_image_source
+is_video_source = is_webcam_source or (not is_image_source)
+show_playback_bar = not (is_image_source or is_webcam_source)
 
 # Define image elements (shared between layouts)
 main_img_elem = DynamicImage(sample_frame)
@@ -69,7 +75,7 @@ zoom_slider = Slider("Zoom", 0.75, min_val=0, max_val=1, step=0.05, marker_step=
 save_btn = ImmediateButton("Save", color=(125, 185, 0), text_color=(255, 255, 255), text_scale=0.75)
 
 # Create lock/unlock icons for zoom controls
-lock_icon, unlockicon = draw_lock_icons(locked_color=(80, 95, 80))
+lock_icon, unlockicon = draw_lock_icons(locked_color=(80, 95, 80), unlocked_color=(30, 70, 220))
 lock_btn = ToggleImageButton(unlockicon, lock_icon)
 zoom_slider_and_btn = HStack(zoom_slider, lock_btn, flex=(1, 0))
 
@@ -130,9 +136,9 @@ window.enable_size_control(display_size)
 window.attach_mouse_callbacks(ui_layout)
 window.attach_keypress_callbacks(
     {
-        "Toggle playback": {" ": vreader.toggle_pause} if show_playback_bar else None,
+        "Toggle playback": {" ": vreader.toggle_pause} if is_video_source else None,
         "Step video backwards/forwards": (
-            {",": vreader.prev_frame, ".": vreader.next_frame} if show_playback_bar else None
+            {",": vreader.prev_frame, ".": vreader.next_frame} if is_video_source else None
         ),
         "Change layout": {KEY.TAB: ui_layout.next},
         "Toggle zoom lock": {"z": lock_btn.toggle},
@@ -150,7 +156,7 @@ window.attach_keypress_callbacks(
     },
 )
 window.report_keypress_descriptions()
-print("- Middle click image to lock zoom!", "- Right click to reset crop region", sep="\n")
+print("- Right click to reset crop region", "- Click and drag zoomed image to pan", sep="\n")
 
 # Initialize crop data to make sure it's available in the loop
 crop_frame = sample_frame.copy()
@@ -162,7 +168,7 @@ with window.auto_close(vreader.release):
 
         # We don't need to update displayed images if using a static source
         # (not strictly necessary, slightly more efficient for static images)
-        if not is_image_source:
+        if is_video_source:
             zoom_img_elem.set_image(frame)
             main_img_elem.set_image(frame)
 
