@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
+from time import perf_counter
+
 import cv2
 import numpy as np
 
@@ -313,6 +315,73 @@ class TextOverlay(BaseOverlay):
             return frame
 
         return self.style.text.xy_norm(frame, self._text, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px)
+
+    # .................................................................................................................
+
+
+class HoverLabelOverlay(BaseOverlay):
+    """
+    Simple overlay used to display text when hovering an element.
+    Text will disappear after some idle time if the user does not move their mouse.
+    """
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        base_item: BaseCallback,
+        label: str = "Hover Label",
+        idle_timeout_ms: int = 750,
+        xy_norm: XYNORM = (0.5, 0),
+        scale: float = 0.35,
+        thickness: int = 1,
+        color: COLORU8 = (255, 255, 255),
+        bg_color: COLORU8 = (0, 0, 0),
+        anchor_xy_norm: XYNORM | None = None,
+        offset_xy_px: XYPX = (0, 0),
+    ):
+        self._label = label
+        self._idle_timeout_ms = idle_timeout_ms
+        self._timeout_target_ms = -1
+        self._need_text = False
+        self._is_in_region = False
+
+        self.style = UIStyle(
+            text=TextDrawer(scale, color=color, bg_color=bg_color),
+            idle_timeout_ms=idle_timeout_ms,
+        )
+        self._xy_norm = xy_norm
+        self._anchor_xy_norm = anchor_xy_norm
+        self._offset_xy_px = offset_xy_px
+
+        # Inherit from parent
+        super().__init__(base_item)
+
+    def set_label(self, label: str) -> SelfType:
+        """Update the label shown on hover"""
+        self._label = label
+        return self
+
+    def _on_move(self, cbxy, cbflags) -> None:
+
+        self._is_in_region = cbxy.is_in_region
+        if cbxy.is_in_region:
+            self._need_text = True
+            self._timeout_target_ms = round(perf_counter() * 1000) + self.style.idle_timeout_ms
+
+        return
+
+    def _render_overlay(self, frame: ndarray) -> ndarray:
+
+        if self._need_text:
+            curr_time_ms = round(perf_counter() * 1000)
+            self._need_text = self._is_in_region and (curr_time_ms < self._timeout_target_ms)
+            if self._need_text:
+                return self.style.text.xy_norm(
+                    frame, self._label, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px
+                )
+
+        return frame
 
     # .................................................................................................................
 

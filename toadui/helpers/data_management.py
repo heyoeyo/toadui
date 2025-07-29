@@ -5,6 +5,8 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
+from collections import OrderedDict
+
 # For type hints
 from typing import Any
 
@@ -116,6 +118,60 @@ class DelayableValueChangeTracker:
     def clear(self, clear_value: Any = None):
         """Helper that is identical to 'record(None)' but may be nicer to use to indicate intent"""
         self._prev_value = clear_value
+
+    # .................................................................................................................
+
+
+class MaxLengthKVStorage:
+    """
+    Helper object used to implement key-value storage (e.g. a dictionary)
+    with a max-length. If items are added beyond the max length, the oldest
+    items will be eliminated (i.e. FIFO).
+    """
+
+    # .................................................................................................................
+
+    def __init__(self, max_length: int = 30):
+        self.data = OrderedDict()
+        self._max_length = max_length
+
+    def __repr__(self):
+        return self.data.__repr__()
+
+    def __len__(self):
+        return len(self.data.keys())
+
+    def __iter__(self):
+        return self.data.__iter__()
+
+    def __setitem__(self, key, value):
+        return self.store(key, value)
+
+    def __getitem__(self, key):
+        return self.data.__getitem__(key)
+
+    # .................................................................................................................
+
+    def items(self):
+        return self.data.items()
+
+    def clear(self):
+        self.data.clear()
+
+    def store(self, key: Any, value: Any):
+        """
+        Store new key-value pair.
+        Older entries will be removed if the storage size
+        exceeds the set maximum length.
+        """
+        self.data[key] = value
+        if len(self.data) > self._max_length:
+            self.data.popitem(last=False)
+        return self
+
+    def get(self, key: Any, value_if_missing: Any = None) -> Any:
+        """Retrieve item from storage"""
+        return self.data.get(key, value_if_missing)
 
     # .................................................................................................................
 

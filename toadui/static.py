@@ -159,10 +159,21 @@ class HSeparator(BaseCallback):
 
     # .................................................................................................................
 
-    def __init__(self, width: int = 2, color: COLORU8 = (20, 20, 20)):
+    def __init__(
+        self,
+        width: int = 2,
+        color: COLORU8 = (20, 20, 20),
+        label: str | None = None,
+        is_flexible_h: bool = True,
+        is_flexible_w: bool = False,
+    ):
         self._cached_img = blank_image(1, width, color)
-        self.style = UIStyle(color=color)
-        super().__init__(1, width, is_flexible_h=True, is_flexible_w=False)
+        self._label = label
+        self.style = UIStyle(
+            color=color,
+            text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
+        )
+        super().__init__(1, width, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
 
     # .................................................................................................................
 
@@ -173,11 +184,11 @@ class HSeparator(BaseCallback):
     # .................................................................................................................
 
     def _render_up_to_size(self, h: int, w: int) -> ndarray:
-
-        # Re-use stored image, if sizing doesn't change, otherwise re-draw it
         img_h, img_w = self._cached_img.shape[0:2]
         if img_h != h or img_w != w:
             self._cached_img = blank_image(h, w, self.style.color)
+            if self._label is not None:
+                self._cached_img = self.style.text.xy_centered(self._cached_img, self._label)
         return self._cached_img
 
     # .................................................................................................................
@@ -187,10 +198,21 @@ class VSeparator(BaseCallback):
 
     # .................................................................................................................
 
-    def __init__(self, height: int = 2, color: COLORU8 = (20, 20, 20)):
+    def __init__(
+        self,
+        height: int = 2,
+        color: COLORU8 = (20, 20, 20),
+        label: str | None = None,
+        is_flexible_h: bool = False,
+        is_flexible_w: bool = True,
+    ):
         self._cached_img = blank_image(height, 1, color)
-        self.style = UIStyle(color=color)
-        super().__init__(height, 1, is_flexible_h=False, is_flexible_w=True)
+        self._label = label
+        self.style = UIStyle(
+            color=color,
+            text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
+        )
+        super().__init__(height, 1, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
 
     # .................................................................................................................
 
@@ -201,11 +223,11 @@ class VSeparator(BaseCallback):
     # .................................................................................................................
 
     def _render_up_to_size(self, h: int, w: int) -> ndarray:
-
-        # Re-use stored image, if sizing doesn't change, otherwise re-draw it
         img_h, img_w = self._cached_img.shape[0:2]
         if img_h != h or img_w != w:
             self._cached_img = blank_image(h, w, self.style.color)
+            if self._label is not None:
+                self._cached_img = self.style.text.xy_centered(self._cached_img, self._label)
         return self._cached_img
 
     # .................................................................................................................
