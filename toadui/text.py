@@ -12,7 +12,7 @@ from toadui.helpers.styling import UIStyle
 from toadui.helpers.text import TextDrawer, find_minimum_text_width
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline
-from toadui.helpers.colors import pick_contrasting_gray_color
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 
 # For type hints
 from numpy import ndarray
@@ -31,7 +31,7 @@ class TextBlock(CachedBgFgElement):
     def __init__(
         self,
         text: str = "",
-        color: COLORU8 = (30, 25, 25),
+        color: COLORU8 | int = (30, 25, 25),
         text_scale: float = 0.35,
         max_characters: int = 8,
         height: int = 40,
@@ -45,6 +45,7 @@ class TextBlock(CachedBgFgElement):
         self._value_txtdraw = TextDrawer(text_scale)
 
         # Set up element styling
+        color = interpret_coloru8(color)
         fg_color = pick_contrasting_gray_color(color)
         txtdraw = TextDrawer(scale=text_scale, color=fg_color, max_height=height)
         self.style = UIStyle(
@@ -104,7 +105,7 @@ class PrefixedTextBlock(TextBlock):
         prefix: str = "Label: ",
         initial_value: str = "-",
         suffix: str = "",
-        color: COLORU8 = (30, 25, 25),
+        color: COLORU8 | int = (30, 25, 25),
         text_scale: float = 0.35,
         max_characters: int | str = 8,
         height: int = 40,
@@ -163,7 +164,7 @@ class SubtitledTextBlock(CachedBgFgElement):
         self,
         title: str,
         subtitle: str,
-        color: COLORU8 = (64, 53, 52),
+        color: COLORU8 | int = (64, 53, 52),
         text_scale: float = 0.5,
         height: int = 80,
         is_flexible_w: bool = True,
@@ -178,7 +179,7 @@ class SubtitledTextBlock(CachedBgFgElement):
         text_title = TextDrawer(text_scale * 1.25, font=cv2.FONT_HERSHEY_DUPLEX, max_height=half_height)
         text_subtitle = TextDrawer(text_scale, max_height=half_height)
         self.style = UIStyle(
-            color=color,
+            color=interpret_coloru8(color),
             outline_color=(0, 0, 0),
             text_title=text_title,
             text_subtitle=text_subtitle,

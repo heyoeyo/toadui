@@ -12,7 +12,7 @@ from toadui.text import TextDrawer
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline, draw_normalized_polygon
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.colors import pick_contrasting_gray_color
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 
 # For type hints
 from typing import Any
@@ -31,7 +31,7 @@ class TextCarousel(CachedBgFgElement):
     def __init__(
         self,
         key_value_pairs: dict | tuple,
-        color: COLORU8 = (60, 60, 60),
+        color: COLORU8 | int = (60, 60, 60),
         height: int = 40,
         minimum_width: int = 128,
         text_scale: float = 0.5,
@@ -64,6 +64,7 @@ class TextCarousel(CachedBgFgElement):
         self._right_edge_x_norm = 0.5 + center_deadspace
 
         # Set up element styling
+        color = interpret_coloru8(color)
         fg_color = pick_contrasting_gray_color(color)
         self.style = UIStyle(
             color=color,

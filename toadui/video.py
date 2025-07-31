@@ -17,7 +17,7 @@ from toadui.helpers.sizing import get_image_hw_for_max_side_length
 from toadui.helpers.drawing import draw_box_outline
 from toadui.helpers.icons import draw_play_pause_icons
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.colors import pick_contrasting_gray_color, lerp_colors
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color, lerp_colors
 from toadui.patterns.truchet import draw_truchet, make_dot_tiles
 from toadui.cli import ask_for_path_if_missing
 
@@ -548,7 +548,7 @@ class VideoPlaybackSlider(BaseCallback):
     def __init__(
         self,
         video_reader: PauseableVideoReader,
-        color: COLORU8 = (0, 0, 0),
+        color: COLORU8 | int = (0, 0, 0),
         indicator_line_width: int = 1,
         include_button: bool = True,
         pause_on_right_click: bool = True,
@@ -581,6 +581,7 @@ class VideoPlaybackSlider(BaseCallback):
         self._bar_w_norm = 1
 
         # Set up element style
+        color = interpret_coloru8(color)
         ind_color = pick_contrasting_gray_color(color)
         color_fg = lerp_colors(color, ind_color, 0.25)
         self.style = UIStyle(

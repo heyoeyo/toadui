@@ -9,6 +9,7 @@ import cv2
 import numpy as np
 
 # For type hints
+from typing import Iterable
 from toadui.helpers.types import COLORU8
 
 
@@ -18,6 +19,33 @@ from toadui.helpers.types import COLORU8
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Functions
+
+
+def interpret_coloru8(color: COLORU8 | int | float | None, fallback_color=None) -> COLORU8 | None:
+    """
+    Helper used to interpret color inputs with convenience features
+    - Supports float inputs (will be rounded to nearest integer in 0-to-255 range)
+    - Supports single value inputs (will be converted to 3-tuple)
+    - Supports fallback colors (e.g. if None is given, replace with fallback)
+
+    Returns:
+        color_3ch_uint8 (or None if no color or fallback)
+    """
+
+    # Try to replace missing color with fallback, if none available, bail
+    out_color = color
+    if color is None:
+        out_color = fallback_color
+    if out_color is None:
+        return None
+
+    # Convert to tuple of 3 integers
+    if not isinstance(out_color, Iterable):
+        out_color = (out_color, out_color, out_color)
+    return tuple(int(min(255, max(0, round(val)))) for val in out_color)
+
+
+# .....................................................................................................................
 
 
 def convert_color(color: COLORU8, conversion_code: int) -> tuple[int, int, int]:

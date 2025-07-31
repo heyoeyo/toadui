@@ -12,7 +12,7 @@ from toadui.base import BaseCallback, CachedBgFgElement
 from toadui.helpers.text import TextDrawer
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline, draw_drop_shadow, draw_rectangle_norm
-from toadui.helpers.colors import adjust_as_hsv, pick_contrasting_gray_color, lerp_colors
+from toadui.helpers.colors import interpret_coloru8, adjust_as_hsv, pick_contrasting_gray_color, lerp_colors
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.sizing import get_image_hw_to_fit_region, resize_hw
 
@@ -34,10 +34,10 @@ class ToggleButton(BaseCallback):
         self,
         label: str,
         default_state: bool = False,
-        color_on: COLORU8 = (70, 65, 180),
-        color_off: COLORU8 | None = None,
-        text_color_on: COLORU8 | None = None,
-        text_color_off: COLORU8 | None = None,
+        color_on: COLORU8 | int = (70, 65, 180),
+        color_off: COLORU8 | int | None = None,
+        text_color_on: COLORU8 | int | None = None,
+        text_color_off: COLORU8 | int | None = None,
         height: int = 40,
         text_scale: float = 0.5,
         is_flexible_w: bool = True,
@@ -52,13 +52,11 @@ class ToggleButton(BaseCallback):
         self._is_changed = True
 
         # Figure out missing colors, if needed
+        color_on = interpret_coloru8(color_on)
+        color_off = interpret_coloru8(color_off, adjust_as_hsv(color_on, 1, 0.5, 0.8))
+        text_color_on = interpret_coloru8(text_color_on, pick_contrasting_gray_color(color_on))
+        text_color_off = interpret_coloru8(text_color_off, lerp_colors(color_off, text_color_on, 0.5))
         color_drop_shadow = adjust_as_hsv(color_on, 1, 1.5, 0.35)
-        if text_color_on is None:
-            text_color_on = pick_contrasting_gray_color(color_on)
-        if color_off is None:
-            color_off = adjust_as_hsv(color_on, 1, 0.5, 0.8)
-        if text_color_off is None:
-            text_color_off = lerp_colors(color_off, text_color_on, 0.5)
 
         # Set up element styling
         self._label = f" {label} "
@@ -86,8 +84,8 @@ class ToggleButton(BaseCallback):
         cls,
         *labels: list[str],
         default_state: bool = False,
-        color_on: COLORU8 = (70, 65, 180),
-        color_off: COLORU8 | None = None,
+        color_on: COLORU8 | int = (70, 65, 180),
+        color_off: COLORU8 | int | None = None,
         height: int = 40,
         text_scale: float = 0.5,
     ):
@@ -262,8 +260,8 @@ class ImmediateButton(BaseCallback):
     def __init__(
         self,
         label: str,
-        color: COLORU8 = (100, 80, 90),
-        text_color: COLORU8 | None = None,
+        color: COLORU8 | int = (100, 80, 90),
+        text_color: COLORU8 | int | None = None,
         height: int = 40,
         text_scale: float = 0.5,
         is_flexible_w: bool = True,
@@ -275,9 +273,9 @@ class ImmediateButton(BaseCallback):
         # Storage for button state
         self._is_changed = False
 
-        # Set default text color, if none provided
-        if text_color is None:
-            text_color = pick_contrasting_gray_color(color)
+        # Handle different possible color inputs
+        color = interpret_coloru8(color)
+        text_color = interpret_coloru8(text_color, pick_contrasting_gray_color(color))
 
         # Set up element styling
         self._label = f" {label} "
@@ -300,8 +298,8 @@ class ImmediateButton(BaseCallback):
     def many(
         cls,
         *labels: list[str],
-        color: COLORU8 = (100, 80, 90),
-        text_color: COLORU8 | None = None,
+        color: COLORU8 | int = (100, 80, 90),
+        text_color: COLORU8 | int | None = None,
         height: int = 40,
         text_scale: float = 0.5,
     ):

@@ -10,7 +10,7 @@ import numpy as np
 
 from toadui.base import CachedBgFgElement
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.colors import pick_contrasting_gray_color, lerp_colors
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color, lerp_colors
 from toadui.helpers.text import TextDrawer
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline
@@ -38,7 +38,7 @@ class Slider(CachedBgFgElement):
         min_val: float = 0.0,
         max_val: float = 1.0,
         step: float = 0.05,
-        color: COLORU8 = (40, 40, 40),
+        color: COLORU8 | int = (40, 40, 40),
         indicator_width: int = 1,
         text_scale: float = 0.5,
         marker_step: float | None = None,
@@ -68,6 +68,7 @@ class Slider(CachedBgFgElement):
 
         # Set up text drawing
         txt_h = height * 0.8
+        color = interpret_coloru8(color)
         fg_color = pick_contrasting_gray_color(color)
         fg_text = TextDrawer(scale=text_scale, color=fg_color, max_height=txt_h)
         bg_text = TextDrawer(scale=text_scale, color=lerp_colors(fg_color, color, 0.55), max_height=txt_h)
@@ -226,12 +227,12 @@ class MultiSlider(CachedBgFgElement):
         min_val: float = 0.0,
         max_val: float = 1.0,
         step: float = 0.05,
-        color: COLORU8 = (40, 40, 40),
+        color: COLORU8 | int = (40, 40, 40),
         indicator_width: int = 1,
         text_scale: float = 0.5,
         marker_step: float | None = None,
         enable_value_display: bool = True,
-        fill_color: COLORU8 | None = None,
+        fill_color: COLORU8 | int | None = None,
         height: int = 40,
         minimum_width: int = 64,
     ):
@@ -265,6 +266,7 @@ class MultiSlider(CachedBgFgElement):
 
         # Set up text drawing
         txt_h = height * 0.8
+        color = interpret_coloru8(color)
         fg_color = pick_contrasting_gray_color(color)
         fg_text = TextDrawer(scale=text_scale, color=fg_color, max_height=txt_h)
         bg_text = TextDrawer(scale=text_scale, color=lerp_colors(fg_color, color, 0.55), max_height=txt_h)
@@ -277,7 +279,7 @@ class MultiSlider(CachedBgFgElement):
             marker_color=lerp_colors(fg_color, color, 0.85),
             marker_width=1,
             marker_pad=5,
-            fill_color=fill_color if self._is_filled else (255, 255, 255),
+            fill_color=interpret_coloru8(fill_color, (255, 255, 255)),
             fill_weight=0.5,
             fg_text=fg_text,
             bg_text=bg_text,

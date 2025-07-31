@@ -13,7 +13,7 @@ from toadui.helpers.text import TextDrawer
 from toadui.helpers.images import blank_image
 from toadui.helpers.sizing import get_image_hw_to_fit_region
 from toadui.helpers.drawing import draw_box_outline
-from toadui.helpers.colors import pick_contrasting_gray_color
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 
 # For type hints
 from numpy import ndarray
@@ -90,7 +90,7 @@ class StaticMessageBar(BaseCallback):
         self,
         *messages: str,
         text_scale: float = 0.5,
-        color: COLORU8 = (150, 110, 15),
+        color: COLORU8 | int = (150, 110, 15),
         height: int = 40,
         space_equally: bool = False,
         is_flexible_w: bool = True,
@@ -100,6 +100,7 @@ class StaticMessageBar(BaseCallback):
         self._msgs_list = [f" {msg}  " for msg in messages if msg is not None]
 
         # Store visual settings
+        color = interpret_coloru8(color)
         self._base_image = blank_image(1, 1, color)
         self._cached_img = self._base_image.copy()
         text_color = pick_contrasting_gray_color(color)
@@ -162,7 +163,7 @@ class HSeparator(BaseCallback):
     def __init__(
         self,
         width: int = 2,
-        color: COLORU8 = (20, 20, 20),
+        color: COLORU8 | int = (20, 20, 20),
         label: str | None = None,
         is_flexible_h: bool = True,
         is_flexible_w: bool = False,
@@ -170,7 +171,7 @@ class HSeparator(BaseCallback):
         self._cached_img = blank_image(1, width, color)
         self._label = label
         self.style = UIStyle(
-            color=color,
+            color=interpret_coloru8(color),
             text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
         )
         super().__init__(1, width, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
@@ -178,7 +179,7 @@ class HSeparator(BaseCallback):
     # .................................................................................................................
 
     @classmethod
-    def many(cls, num_separators: int, width: int = 2, color: COLORU8 = (20, 20, 20)):
+    def many(cls, num_separators: int, width: int = 2, color: COLORU8 | int = (20, 20, 20)):
         return [cls(width, color) for _ in range(num_separators)]
 
     # .................................................................................................................
@@ -201,7 +202,7 @@ class VSeparator(BaseCallback):
     def __init__(
         self,
         height: int = 2,
-        color: COLORU8 = (20, 20, 20),
+        color: COLORU8 | int = (20, 20, 20),
         label: str | None = None,
         is_flexible_h: bool = False,
         is_flexible_w: bool = True,
@@ -209,7 +210,7 @@ class VSeparator(BaseCallback):
         self._cached_img = blank_image(height, 1, color)
         self._label = label
         self.style = UIStyle(
-            color=color,
+            color=interpret_coloru8(color),
             text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
         )
         super().__init__(height, 1, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
@@ -217,7 +218,7 @@ class VSeparator(BaseCallback):
     # .................................................................................................................
 
     @classmethod
-    def many(cls, num_separators: int, height: int = 2, color: COLORU8 = (20, 20, 20)):
+    def many(cls, num_separators: int, height: int = 2, color: COLORU8 | int = (20, 20, 20)):
         return [cls(height, color) for _ in range(num_separators)]
 
     # .................................................................................................................
