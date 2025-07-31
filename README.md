@@ -1,6 +1,6 @@
 # ToadUI
 
-ToadUI is a helper UI library built on top of the basic UI provided by [OpenCV](https://opencv.org/). As such, it inherits much of the UI limitations of OpenCV. The goal is to provide ready-to-use UI elements that are not already part of OpenCV (e.g. buttons).
+ToadUI is a helper UI library, written in Python, built on top of the basic UI provided by [OpenCV](https://opencv.org/). As such, it inherits much of the UI limitations of OpenCV but also it's ease of use. The goal is to provide ready-to-use UI elements that are not already part of OpenCV (e.g. buttons), while remaining easily compatible with existing code that uses OpenCV and/or [NumPy](https://numpy.org/).
 
 <p align="center">
   <img src="https://github.com/user-attachments/assets/285c9cfa-1a4e-4347-bb1f-1b8bf4a1a242">
@@ -9,12 +9,12 @@ ToadUI is a helper UI library built on top of the basic UI provided by [OpenCV](
 Check out the [demos](https://github.com/heyoeyo/toadui/tree/main/demos) to see what can be done with ToadUI.
 
 > [!IMPORTANT]
-> This library is still in early development
+> This library is still in early development, expect breaking changes as the structure of the library stabilizes
 
 
 ## Who is this for?
 
-This library is intended for prototyping and is geared towards handling video (or video-like) visualizations. For example, earlier versions of the library have been used to interactively visualize the internal state of vision transformer models (see experiments from [MuggledDPT](https://github.com/heyoeyo/muggled_dpt/tree/main/experiments) and [MuggledSAM](https://github.com/heyoeyo/muggled_sam/tree/main/experiments)).
+This library is intended for prototyping and is geared towards handling video (or video-like) visualizations. Any data that can be converted to a 2D NumPy array is suitable. For example, earlier versions of the library have been used to interactively visualize the internal state of vision transformer models (see experiments from [MuggledDPT](https://github.com/heyoeyo/muggled_dpt/tree/main/experiments) and [MuggledSAM](https://github.com/heyoeyo/muggled_sam/tree/main/experiments)).
 
 
 ### Basic features
@@ -27,14 +27,15 @@ This library is intended for prototyping and is geared towards handling video (o
 
 ### Better than XYZ alternative?
 
-This library is not meant for making professional or consumer-facing UIs. It's also poorly suited to anything requiring text input from users, at least for now. It's mainly recommended for those who are already using OpenCV.
+If you're looking to make a UI for a _product_, ToadUI probably isn't suitable!
 
-If you're looking to make a UI for a _product_, this library probably isn't suitable!
+This library is mainly recommended for those who are already using OpenCV, or for exploratory data analysis. It's not meant for making professional or consumer-facing UIs. It's also poorly suited to anything requiring text input from users, at least for now.
+
 
 
 ## Installation
 
-ToadUI is still in early development and is therefore not recommended for use in any serious projects. However, it can be installed using pip or uv if you would like to experiment with it. It can be installed into an existing project using Github:
+ToadUI is still in early development and is therefore not recommended for projects requiring stability. However, it can be installed using pip or uv if you would like to experiment with it. It can be installed into an existing project using Github:
 
 <details>
 <summary>Using pip</summary>
