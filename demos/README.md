@@ -4,6 +4,18 @@ This folder contains examples built using ToadUI. Many of the scripts have addit
 
 These demos are written so that the main functionality fits within ~100 lines of code. They're meant to be simple to follow and/or modify.  The main logic is usually found at the end of the script, under a `with window.auto_close` block, so start there if you'd like to make changes.
 
+## colorspace_viewer.py
+
+This demo displays [color space](https://en.wikipedia.org/wiki/Color_space) information for images, videos or webcam inputs.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3e7a1f02-7830-4921-8d43-7602e42a4e58" style="width:400px">
+</p>
+
+In addition to showing separate channel information for a variety of different color spaces (e.g. [RGB](https://en.wikipedia.org/wiki/RGB_color_spaces), [LAB](https://en.wikipedia.org/wiki/CIELAB_color_space), [HSV](https://en.wikipedia.org/wiki/HSL_and_HSV), [YCrCb](https://en.wikipedia.org/wiki/YCbCr), [XYZ](https://en.wikipedia.org/wiki/CIE_1931_color_space) etc.), there are controls to [threshold](https://en.wikipedia.org/wiki/Thresholding_(image_processing)) each of the separate color channels as well as apply [histogram equalization](https://en.wikipedia.org/wiki/Histogram_equalization). It's also possible to visualize the histograms themselves as simple line or bar plots.
+
+**UI Elements:**  ToggleButton, RadioBar, MultiSlider, SimpleHistogramPlot, GridStack, Swapper
+
 ## game_of_life.py
 
 This demo runs an implementation of [Conway's Game of Life](https://en.wikipedia.org/wiki/Conway%27s_Game_of_Life), while maintaining a heatmap.
