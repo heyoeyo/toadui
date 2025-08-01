@@ -525,6 +525,8 @@ class CachedBgFgElement(BaseCallback):
 
     def __init__(self, min_h: int, min_w: int, is_flexible_h: bool = False, is_flexible_w: bool = False):
         super().__init__(min_h, min_w, is_flexible_h, is_flexible_w)
+        self._cache_h = -1
+        self._cache_w = -1
         self._cached_bg_img = np.zeros((1, 1, 3), dtype=np.uint8)
         self._cached_fg_img = np.zeros((1, 1, 3), dtype=np.uint8)
         self._needs_fg_repaint = True
@@ -534,6 +536,8 @@ class CachedBgFgElement(BaseCallback):
     def request_full_repaint(self, need_repaint=True) -> SelfType:
         """Force a re-paint of both the background & foreground images"""
         if need_repaint:
+            self._cache_h = -1
+            self._cache_w = -1
             self._cached_bg_img = np.zeros((1, 1, 3), dtype=np.uint8)
         return self
 
@@ -547,8 +551,9 @@ class CachedBgFgElement(BaseCallback):
     def _render_up_to_size(self, h: int, w: int) -> ndarray:
 
         # Re-render background on size change
-        img_h, img_w = self._cached_bg_img.shape[0:2]
-        if img_h != h or img_w != w:
+        if self._cache_h != h or self._cache_w != w:
+            self._cache_h = h
+            self._cache_w = w
             self._cached_bg_img = self._rerender_bg(h, w)
             self._needs_fg_repaint = True
 

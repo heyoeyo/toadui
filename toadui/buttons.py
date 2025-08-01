@@ -433,21 +433,22 @@ class RadioBar(CachedBgFgElement):
 
     def __init__(
         self,
-        *labels,
-        active_index=0,
-        color_on=(95, 90, 75),
-        color_off=None,
-        text_scale=0.5,
-        proportional_sizing=False,
-        height=40,
-        is_flexible_w=True,
+        *labels: str | float | int,
+        active_index: int = 0,
+        color_on: COLORU8 = (95, 90, 75),
+        color_off: COLORU8 | None = None,
+        text_scale: float = 0.5,
+        proportional_sizing: bool = False,
+        label_padding: int = 2,
+        height: int = 40,
+        is_flexible_w: bool = True,
     ):
 
         self._labels = tuple(str(label) for label in labels)
         self._cached_img = blank_image(1, 1)
         self._active_idx = active_index
         self._is_changed = True
-        self._enable_wrap_around = False
+        self._enable_wrap_around = True
 
         if color_off is None:
             color_off = adjust_as_hsv(color_on, 1, 0.35, 0.65)
@@ -465,7 +466,8 @@ class RadioBar(CachedBgFgElement):
 
         # Figure out sizing per label/button
         # -> Also pre-compute rectangle bounding box & mid-point, for rendering
-        w_per_txt = [self.style.text_on.get_text_size(f" {label} ").w for label in self._labels]
+        pad = " " * max(0, label_padding)
+        w_per_txt = [self.style.text_on.get_text_size(f"{pad}{label}{pad}").w for label in self._labels]
         self._btn_cumw_norm = np.cumsum(w_per_txt) / sum(w_per_txt)
         if not proportional_sizing:
             self._btn_cumw_norm = np.linspace(0, 1, 1 + len(self._labels), dtype=np.float32)[1:]
@@ -483,9 +485,9 @@ class RadioBar(CachedBgFgElement):
 
     # .................................................................................................................
 
-    def enable_wrap_around(self, enable: bool = True) -> SelfType:
-        """Enable/disable wrap-around when cycling entries"""
-        self._enable_wrap_around = enable
+    def enable_wrap_around(self, enable: bool | None = None) -> SelfType:
+        """Enable/disable wrap-around when cycling entries (acts as toggle if given 'None')"""
+        self._enable_wrap_around = (not self._enable_wrap_around) if enable is None else enable
         return self
 
     def read(self) -> tuple[bool, int, str]:
@@ -511,7 +513,7 @@ class RadioBar(CachedBgFgElement):
         # Store results
         return self.set_index(new_idx)
 
-    def prev(self, decrement=1) -> SelfType:
+    def prev(self, decrement: int = 1) -> SelfType:
         """Function used to select the previous option (with wrap-around)"""
         return self.next(-decrement)
 

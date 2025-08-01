@@ -203,13 +203,10 @@ def histogram_equalization(
     """
     Function used to perform histogram equalization on a uint8 image.
     This function uses the built-in opencv function: cv2.equalizeHist(...)
-    When the min/max thresholds are not set (since it works faster),
-    however this implementation also supports truncating the low/high
-    end of the input.
+    when using a (0, 1) min/max range.
 
-    This means that equalization can be performed over a subset of
-    the input value range, which makes better use of the value range
-    when using thresholded inputs.
+    When a range other than (0,1) is given, the input
+    will be equalized between this range.
 
     If a multi-channel image is provided, then each channel will
     be independently equalized!
@@ -225,33 +222,30 @@ def histogram_equalization(
         return result
 
     # Make sure min/max are properly ordered & separated
-    min_value, max_value = [int(round(255 * value)) for value in sorted((min_pct, max_pct))]
-    max_value = max(max_value, min_value + 1)
-    if min_value == 0 and max_value == 255:
+    min_uint8, max_uint8 = [int(round(255 * value)) for value in sorted((min_pct, max_pct))]
+    min_uint8, max_uint8 = (254, 255) if min_uint8 >= 254 else (min_uint8, max_uint8)
+    min_uint8, max_uint8 = (0, 1) if max_uint8 <= 1 else (min_uint8, max_uint8)
+    if min_uint8 <= 0 and max_uint8 >= 255:
         if image_uint8.ndim == 1:
             return cv2.equalizeHist(image_uint8).squeeze()
         elif image_uint8.ndim == 2:
             return cv2.equalizeHist(image_uint8)
-        else:
+        elif image_uint8.ndim == 3:
             num_channels = image_uint8.shape[2]
-            return np.dstack([image_uint8[:, :, c] for c in range(num_channels)])
+            return np.dstack([histogram_equalization(image_uint8[:, :, c]) for c in range(num_channels)])
 
     # Compute histogram of input
-    num_bins = 1 + max_value - min_value
-    bin_counts, _ = np.histogram(image_uint8, num_bins, range=(min_value, max_value))
+    h_bins = np.arange(257, dtype=np.int32)
+    bin_counts, _ = np.histogram(image_uint8, h_bins)
 
-    # Compute cdf of histogram counts
+    # Compute cumulative density function from histogram counts
+    # -> Normalize cdf between min_pct & max_pct, so equalization applies to this range only!
     cdf = bin_counts.cumsum()
-    cdf_min, cdf_max = cdf.min(), cdf.max()
-    cdf_norm = (cdf - cdf_min) / float(max(cdf_max - cdf_min, 1))
-    cdf_uint8 = np.uint8(255 * cdf_norm)
-
-    # Extend cdf to match 256 lut sizing, in case we skipped min/max value ranges
-    low_end = np.zeros(min_value, dtype=np.uint8)
-    high_end = np.full(255 - max_value, 255, dtype=np.uint8)
-    equalization_lut = np.concatenate((low_end, cdf_uint8, high_end))
+    cdf_min, cdf_max = cdf[0], cdf[-1]
+    cdf_norm = min_pct + (max_pct - min_pct) * (cdf - cdf_min) / (cdf_max - cdf_min)
 
     # Apply LUT mapping to input
+    equalization_lut = np.round(cdf_norm * 255).astype(np.uint8)
     return equalization_lut[image_uint8]
 
 

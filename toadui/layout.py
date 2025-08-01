@@ -12,7 +12,7 @@ from toadui.base import BaseCallback
 from toadui.helpers.styling import UIStyle
 
 # For type hints
-from typing import Iterable
+from typing import Iterable, Any
 from numpy import ndarray
 from toadui.base import BaseOverlay, CBRenderSizing
 from toadui.helpers.types import SelfType, HWPX
@@ -803,15 +803,30 @@ class Swapper(BaseCallback):
     """
     Special layout item which allows for swapping between elements.
     This can be used to switch between different UI layouts, for example.
+
+    Items can be swapped between using .set_swap_index(...), which
+    will switch to items based on the indexing order used when
+    initializing the swap instance.
+    Alternatively, an optional 'keys' init argument can be used
+    to assign labels, which can be swapped between using
+    the .set_swap_key(...) function.
     """
 
     # .................................................................................................................
 
-    def __init__(self, *swap_items: BaseCallback, initial_index: int = 0):
+    def __init__(self, *swap_items: BaseCallback, initial_index: int = 0, keys: Iterable[str] | None = None):
 
         self._items: tuple[BaseCallback] = tuple(swap_items)
         self._swap_idx: int = initial_index
         self._num_items: int = len(self._items)
+
+        # Set up key-lookup
+        if keys is None:
+            keys = {idx: idx for idx in range(self._num_items)}
+        assert (
+            len(keys) == self._num_items
+        ), f"Key mismatch! Number of keys ({len(keys)}) must match number of swap items ({self._num_items})"
+        self._key_lut = keys = {key: idx for idx, key in enumerate(keys)}
 
         tallest_child_min_h = max(child._cb_rdr.min_h for child in self._items)
         widest_child_min_w = max(child._cb_rdr.min_w for child in self._items)
@@ -820,10 +835,28 @@ class Swapper(BaseCallback):
 
         super().__init__(tallest_child_min_h, widest_child_min_w, is_flex_h, is_flex_w)
 
-    def set_swap_index(self, swap_index: int):
+    # .................................................................................................................
+
+    def set_swap_index(self, swap_index: int) -> BaseCallback:
+        """
+        Swap to a new item, by index
+        Returns:
+            current_swap_item
+        """
         if 0 <= swap_index < self._num_items:
             self._swap_idx = swap_index
-        return self
+        return self._items[self._swap_idx]
+
+    def set_swap_key(self, swap_key: Any) -> BaseCallback:
+        """
+        Swap to a new item, by key name. Keys can be specified on init.
+        Returns:
+            current_swap_item
+        """
+        self._swap_idx = self._key_lut[swap_key]
+        return self._items[self._swap_idx]
+
+    # .................................................................................................................
 
     def next(self, increment=1):
         self._swap_idx = (self._swap_idx + increment) % self._num_items
@@ -831,6 +864,8 @@ class Swapper(BaseCallback):
 
     def prev(self, decrement=1):
         return self.next(-decrement)
+
+    # .................................................................................................................
 
     def _render_up_to_size(self, h, w):
         return self._items[self._swap_idx]._render_up_to_size(h, w)
