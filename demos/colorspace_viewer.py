@@ -179,7 +179,7 @@ assert (
 # %% Setup input source
 
 # Handle webcam inputs
-input_path = ask_for_video_path(input_path, allow_webcam_inputs=True)
+input_path = ask_for_video_path(input_path, path_type="video or image", allow_webcam_inputs=True)
 is_webcam_source, input_path = read_webcam_string(input_path)
 is_image_source, vreader = load_looping_video_or_image(input_path, display_size)
 
@@ -206,7 +206,7 @@ ch2_swap = Swapper(ch2_img_elem, ch2_histo_plot, keys=ch_swap_keys)
 ch3_swap = Swapper(ch3_img_elem, ch3_histo_plot, keys=ch_swap_keys)
 
 # Create color space selector & mode toggle buttons
-cspace_radio = RadioBar(*valid_cspaces, label_padding=2)
+cspace_radio = RadioBar(*valid_cspaces, label_padding=2).set_label(initial_cspace)
 show_channels_btn = ToggleButton("Show Channels", color_on=(110, 110, 70), default_state=True)
 show_histos_btn = ToggleButton("Show Histograms", color_on=(110, 60, 110))
 disable_adjustments_btn = ToggleButton("Disable Adjustments", color_on=(90, 110, 110))

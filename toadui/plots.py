@@ -110,11 +110,13 @@ class SimpleHistogramPlot(CachedBgFgElement):
     def toggle_bar_plot(self, use_bar_plot: bool | None = None) -> SelfType:
         """Toggle bar plot vs. line plot"""
         self._use_bar_plot = (not self._use_bar_plot) if use_bar_plot is None else use_bar_plot
+        self.request_fg_repaint()
         return self
 
     def toggle_log_scale(self, use_log_scale: bool | None = None) -> SelfType:
         """Toggle log-scale y-axis plotting"""
         self._use_log_scale = (not self._use_log_scale) if use_log_scale is None else use_log_scale
+        self.request_fg_repaint()
         return self
 
     # .................................................................................................................
@@ -170,6 +172,7 @@ class SimpleHistogramPlot(CachedBgFgElement):
                 bin_edges = bin_edges_as_int
 
         self._bins = bin_edges
+        self.request_fg_repaint()
         return self
 
     def set_bins_advanced(self, bin_edges: ndarray) -> SelfType:
@@ -179,11 +182,13 @@ class SimpleHistogramPlot(CachedBgFgElement):
         Prefer the .set_bins(...) function, unless you know you need this
         """
         self._bins = bin_edges
+        self.request_fg_repaint()
         return self
 
     def set_title(self, title: str | None) -> SelfType:
         """Update title of histogram"""
         self._title = title
+        self.request_full_repaint()
         return self
 
     def set_axis_labels(self, x_axis: str | None = None, y_axis: str | None = None) -> SelfType:
@@ -196,6 +201,8 @@ class SimpleHistogramPlot(CachedBgFgElement):
             self._x_label = x_axis if len(x_axis) > 0 else None
         if y_axis is not None:
             self._y_label = y_axis if len(y_axis) > 0 else None
+
+        self.request_full_repaint()
         return self
 
     def set_margins(self, title_margin_px: int | None = None, label_margin_px: int | None = None) -> SelfType:
@@ -208,6 +215,7 @@ class SimpleHistogramPlot(CachedBgFgElement):
             self._label_margin_px = label_margin_px
             self.style.label_text.scale_to_hw(label_margin_px)
 
+        self.request_full_repaint()
         return self
 
     # .................................................................................................................
