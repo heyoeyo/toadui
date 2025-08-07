@@ -1,6 +1,13 @@
 # ToadUI - Demos
 
-This folder contains examples built using ToadUI. Many of the scripts have additional flags that can be viewed by adding `-h` or `--help` when running the scripts.
+This folder contains examples built using ToadUI. They can be run using:
+```base
+python demos/name_of_demo.py
+# or, if using uv
+uv run demos/name_of_demo.py
+```
+
+Many of the scripts have additional flags that can be viewed by adding `--help` when running the scripts. Several scripts support webcams as inputs, you can type: `cam` when prompted for a video input to use a webcam as the video source.
 
 These demos are written so that the main functionality fits within ~100 lines of code. They're meant to be simple to follow and/or modify.  The main logic is usually found at the end of the script, under a `with window.auto_close` block, so start there if you'd like to make changes.
 
@@ -40,6 +47,18 @@ The UI includes support for interactive click-and-drag boxes. The built-in [sele
 
 **UI Elements:** FixedARImage, ZoomImage, Swapper, ToggleImageButton, EditBoxOverlay, DrawRectangleOverlay, VideoPlaybackSlider, PrefixedTextBlock
 
+
+## ocv_lowpass_filtering.py
+
+This demo provides interactive control over various [low-pass filtering](https://en.wikipedia.org/wiki/Low-pass_filter) (e.g. blurring) functions [built into OpenCV](https://docs.opencv.org/4.x/d4/d13/tutorial_py_filtering.html) and includes non-linear options like [morphological](https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html) and [Kuwahara](https://en.wikipedia.org/wiki/Kuwahara_filter) filtering.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/fb147a64-5055-4e43-8033-364d59d4cabf" style="width:400px">
+</p>
+
+This demo works on images, video or webcam inputs.
+
+**UI Elements:** FixedARImage, Swapper, RadioBar, ToggleButton, Slider, TextCarousel, PrefixedTextBlock
 
 ## ocv_optical_flow.py
 
