@@ -152,21 +152,144 @@ def make_vertical_gradient_image(
 def dirty_blur(
     image_uint8: ndarray,
     blur_strength: float = 2,
+    aspect_adjust: float = 0,
     interpolation: int = cv2.INTER_LINEAR,
     border_mode: int = cv2.BORDER_REFLECT,
+    random_seed: int | None = None,
 ) -> ndarray:
-    """Function used to apply a blurring effect based on re-sampling"""
+    """
+    Function used to apply a blurring effect based on re-sampling.
+    The aspect_adjust input should be given as a value between -1 and +1.
+    A value of -1 will re-sample entirely along the x-axis, while
+    a value of +1 will re-sample entirely along the y-axis. A value
+    of 0 will re-sample along both equally (in a circular pattern).
 
+    Note, this function is very slow, as the sampling is re-computed
+    every time it's called! This is only meant for infrequent use. For
+    cases requiring repeat/frequent 'blurring', consider re-implementing
+    with cached sampling meshes for speed-up!
+
+    Returns:
+        resampled_image_uint8
+    """
+
+    # Use seeded/non-seeded random number generation
+    if random_seed is not None:
+        noise_gen = np.random.default_rng(random_seed)
+        noise_func = lambda h, w: noise_gen.standard_normal((h, w))
+    else:
+        noise_func = lambda h, w: np.random.randn(h, w)
+
+    # Build base sampling mesh (if we use this mesh only, we would get back the original image)
     img_hw = image_uint8.shape[0:2]
     yxsample = [np.linspace(0, s - 1, s, dtype=np.float32) for s in img_hw]
     ygrid, xgrid = np.meshgrid(*yxsample, indexing="ij")
 
-    rad_grid = np.random.randn(*img_hw) * blur_strength
-    ang_grid = np.random.randn(*img_hw) * (np.pi * 2.0)
-    xgrid += np.cos(ang_grid) * rad_grid
-    ygrid += np.sin(ang_grid) * rad_grid
+    # Perturb base mesh using random (circular) jitter to get re-sampling blur effect
+    rad_grid = noise_func(*img_hw) * blur_strength
+    ang_grid = noise_func(*img_hw) * (np.pi * 2.0)
+    x_ar, y_ar = np.clip((1 - aspect_adjust, 1 + aspect_adjust), 0, 1)
+    xgrid += np.cos(ang_grid) * rad_grid * x_ar
+    ygrid += np.sin(ang_grid) * rad_grid * y_ar
 
     return cv2.remap(image_uint8, xgrid, ygrid, interpolation, borderMode=border_mode)
+
+
+def kuwahara_filter(
+    image_uint8: ndarray,
+    quadrant_size_xy: int | tuple[int, int] = 3,
+    internal_dtype=np.float32,
+) -> ndarray:
+    """
+    Function which applies Kuwahara filtering to an image.
+    Often produces a painterly looking result.
+
+    Each pixel in the image can be thought of as being contained
+    within 4 quadrants, where the pixel is a corner of each of the
+    quadrants (e.g. top-left, top-right, bottom-left, bottom-right).
+    The Kuwahara filter works by replacing each pixel with the average
+    value of the quadrant with the lowest (grayscale/brightness) variance.
+
+    By taking the average value, the filter has a smoothing/blurring effect.
+    However, by using the quadrant with the lowest variance, quadrants
+    with sharp edges generally won't be used/averaged.
+    This helps avoid blurring edges.
+
+    For more information, see:
+        https://en.wikipedia.org/wiki/Kuwahara_filter
+
+    Returns:
+        filtered_image_uint8
+
+    Notes:
+    - the input image is assumed to be in BGR format or grayscale
+    - assumes image is uint8, other formats may still work (not tested)
+    - the internal_dtype should be np.float32 or np.int32 (others not tested),
+      this only effects internal usage, the output will have the same type
+      as the input image (e.g. uint8)
+    - quadrant_size_xy can be given as a single integer, in which
+      case the value will be shared for both x & y
+    """
+
+    # Force sizing to be an (x, y) tuple
+    if isinstance(quadrant_size_xy, int):
+        quadrant_size_xy = (quadrant_size_xy, quadrant_size_xy)
+
+    # Do nothing if we get zero quadrant_size sizing
+    quad_x, quad_y = [max(0, size) for size in quadrant_size_xy]
+    if quad_x == 0 and quad_y == 0:
+        return image_uint8
+    q_xy = (quad_x, quad_y)
+
+    # For clarity
+    input_has_channels = image_uint8.ndim == 3
+    input_dtype = image_uint8.dtype
+    kernel_xy = [(1 + size) for size in q_xy]
+    border_type = cv2.BORDER_REFLECT101
+    anchor = (0, 0)
+    # ^^^ Use anchor of 0 for better predictability, otherwise changes on even window sizes!
+
+    # Pad input, so that we can use shifted-indexing for kuwahara quadrants
+    padded_img_u8 = cv2.copyMakeBorder(image_uint8, quad_y, quad_y, quad_x, quad_x, borderType=border_type)
+    if not input_has_channels:
+        padded_img_u8 = cv2.cvtColor(padded_img_u8, cv2.COLOR_GRAY2BGR)
+
+    # Convert input to format with a single 'gray' channel (e.g. YUV, though others work as well)
+    # - filter only operates on gray values, non-gray channels are needed to re-build output at the end
+    cvt_img_u8 = cv2.cvtColor(padded_img_u8, cv2.COLOR_BGR2YUV)
+    gray_img = cvt_img_u8[:, :, 0].astype(internal_dtype)
+    u_img_u8 = cvt_img_u8[:, :, 1]
+    v_img_u8 = cvt_img_u8[:, :, 2]
+
+    # Compute mean/variance in window around every pixel
+    mean_img = cv2.blur(gray_img, kernel_xy, anchor=anchor, borderType=border_type)
+    sqmean_img = cv2.blur(np.square(gray_img), kernel_xy, anchor=anchor, borderType=border_type)
+    var_img = sqmean_img - np.square(mean_img)
+
+    # Create mean/variance 'quadrants' per-pixel, for computing kuwahara
+    slice_ax, slice_ay = [slice(size, -size) if size > 0 else slice(None) for size in q_xy]
+    slice_bx, slice_by = [slice(0, -2 * size) if size > 0 else slice(None) for size in q_xy]
+    slice_iter = ((slice_ay, slice_ax), (slice_ay, slice_bx), (slice_by, slice_ax), (slice_by, slice_bx))
+    var_stack = np.dstack([var_img[sy, sx] for sy, sx in slice_iter])
+    mean_stack = np.dstack([mean_img[sy, sx] for sy, sx in slice_iter])
+    u_stack = np.dstack([u_img_u8[sy, sx] for sy, sx in slice_iter])
+    v_stack = np.dstack([v_img_u8[sy, sx] for sy, sx in slice_iter])
+
+    # Get index of quadrant with the lowest gray variance (main trick of kuwahara filtering!)
+    quadrant_idx = np.argmin(var_stack, axis=-1)
+
+    # Re-construct image using kuwahara index to grab per-pixel 'best' quadrants from gray + other channels
+    row_idx = np.arange(quadrant_idx.shape[0])[:, None]
+    col_idx = np.arange(quadrant_idx.shape[1])[None, :]
+    cvt_out = np.empty_like(image_uint8)
+    cvt_out[:, :, 0] = mean_stack[row_idx, col_idx, quadrant_idx].astype(input_dtype)
+    cvt_out[:, :, 1] = u_stack[row_idx, col_idx, quadrant_idx]
+    cvt_out[:, :, 2] = v_stack[row_idx, col_idx, quadrant_idx]
+    output = cv2.cvtColor(cvt_out, cv2.COLOR_YUV2BGR)
+    if not input_has_channels:
+        output = cv2.cvtColor(output, cv2.COLOR_BGR2GRAY)
+
+    return output
 
 
 def convert_xy_norm_to_px(image_shape: IMGSHAPE_HW, *xy_norm_coords: XYNORM) -> tuple[XYPX] | XYPX:
