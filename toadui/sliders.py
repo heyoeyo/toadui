@@ -42,6 +42,7 @@ class Slider(CachedBgFgElement):
         indicator_width: int = 1,
         text_scale: float = 0.5,
         marker_step: float | None = None,
+        typecast=None,
         enable_value_display: bool = True,
         height: int = 40,
         minimum_width: int = 64,
@@ -50,6 +51,12 @@ class Slider(CachedBgFgElement):
         # Make sure the given values make sense
         min_val, max_val = sorted((min_val, max_val))
         initial_value = min(max_val, max(min_val, value))
+
+        # Figure out type casting, if not given, and apply to inputs
+        if typecast is None:
+            is_integer = all((int(val) == val for val in (initial_value, min_val, max_val, step)))
+            typecast = int if is_integer else float
+        initial_value, min_val, max_val, step = [typecast(val) for val in (initial_value, min_val, max_val, step)]
 
         # Storage for slider value
         self._label = label
@@ -61,6 +68,7 @@ class Slider(CachedBgFgElement):
         self._slider_delta = max(self._slider_max - self._slider_min, 1e-9)
         self._marker_x_norm = _get_norm_marker_positions(min_val, max_val, marker_step)
         self._max_precision = _get_step_precision(step)
+        self._type = typecast
 
         # Storage for slider state
         self._is_changed = True
@@ -104,7 +112,7 @@ class Slider(CachedBgFgElement):
         return is_changed, self._slider_value
 
     def set(self, slider_value: int | float, use_as_default_value: bool = True) -> SelfType:
-        new_value = max(self._slider_min, min(self._slider_max, slider_value))
+        new_value = self._type(max(self._slider_min, min(self._slider_max, slider_value)))
         if use_as_default_value:
             self._initial_value = new_value
         self._is_changed |= new_value != self._slider_value
@@ -165,7 +173,7 @@ class Slider(CachedBgFgElement):
         slider_x = round(slider_x / self._slider_step) * self._slider_step
 
         # Finally, make sure the slider value doesn't go out of range
-        return max(self._slider_min, min(self._slider_max, slider_x))
+        return self._type(max(self._slider_min, min(self._slider_max, slider_x)))
 
     # .................................................................................................................
 

@@ -828,12 +828,15 @@ class Swapper(BaseCallback):
         ), f"Key mismatch! Number of keys ({len(keys)}) must match number of swap items ({self._num_items})"
         self._key_lut = keys = {key: idx for idx, key in enumerate(keys)}
 
-        tallest_child_min_h = max(child._cb_rdr.min_h for child in self._items)
-        widest_child_min_w = max(child._cb_rdr.min_w for child in self._items)
-        is_flex_h = any(child._cb_rdr.is_flexible_h for child in self._items)
-        is_flex_w = any(child._cb_rdr.is_flexible_w for child in self._items)
+        item_rdr = self._items[initial_index]._cb_rdr
+        super().__init__(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
 
-        super().__init__(tallest_child_min_h, widest_child_min_w, is_flex_h, is_flex_w)
+    # .................................................................................................................
+
+    def _update_render_sizing(self):
+        item_rdr = self._items[self._swap_idx]._cb_rdr
+        self._cb_rdr = CBRenderSizing(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
+        return None
 
     # .................................................................................................................
 
@@ -844,7 +847,9 @@ class Swapper(BaseCallback):
             current_swap_item
         """
         if 0 <= swap_index < self._num_items:
-            self._swap_idx = swap_index
+            if swap_index != self._swap_idx:
+                self._swap_idx = swap_index
+                self._update_render_sizing()
         return self._items[self._swap_idx]
 
     def set_swap_key(self, swap_key: Any) -> BaseCallback:
@@ -853,13 +858,14 @@ class Swapper(BaseCallback):
         Returns:
             current_swap_item
         """
-        self._swap_idx = self._key_lut[swap_key]
-        return self._items[self._swap_idx]
+        new_idx = self._key_lut[swap_key]
+        return self.set_swap_index(new_idx)
 
     # .................................................................................................................
 
     def next(self, increment=1):
-        self._swap_idx = (self._swap_idx + increment) % self._num_items
+        new_idx = (self._swap_idx + increment) % self._num_items
+        self.set_swap_index(new_idx)
         return self
 
     def prev(self, decrement=1):
@@ -868,7 +874,10 @@ class Swapper(BaseCallback):
     # .................................................................................................................
 
     def _render_up_to_size(self, h, w):
-        return self._items[self._swap_idx]._render_up_to_size(h, w)
+        parent = self._cb_region
+        item = self._items[self._swap_idx]
+        item._cb_region.resize(parent.x1, parent.y1, parent.x2, parent.y2)
+        return item._render_up_to_size(h, w)
 
     def _get_dynamic_aspect_ratio(self):
         return self._items[self._swap_idx]._get_dynamic_aspect_ratio()
