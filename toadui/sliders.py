@@ -42,6 +42,7 @@ class Slider(CachedBgFgElement):
         indicator_width: int = 1,
         text_scale: float = 0.5,
         marker_step: float | None = None,
+        marker_origin: float | None = None,
         typecast=None,
         enable_value_display: bool = True,
         height: int = 40,
@@ -66,7 +67,7 @@ class Slider(CachedBgFgElement):
         self._slider_max = max_val
         self._slider_step = step
         self._slider_delta = max(self._slider_max - self._slider_min, 1e-9)
-        self._marker_x_norm = _get_norm_marker_positions(min_val, max_val, marker_step)
+        self._marker_x_norm = _get_norm_marker_positions(min_val, max_val, marker_step, marker_origin)
         self._max_precision = _get_step_precision(step)
         self._type = typecast
 
@@ -92,6 +93,9 @@ class Slider(CachedBgFgElement):
             outline_color=(0, 0, 0),
             fg_text=fg_text,
             bg_text=bg_text,
+            label_xy_norm=(0, 0.5),
+            label_anchor_xy_norm=None,
+            label_offset_xy_px=(5, 0),
         )
 
         # Inherit from parent
@@ -101,7 +105,7 @@ class Slider(CachedBgFgElement):
 
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
-        return f"{cls_name} ({self._label}"
+        return f"{cls_name} ({self._label})"
 
     # .................................................................................................................
 
@@ -169,8 +173,7 @@ class Slider(CachedBgFgElement):
         """Helper used to convert normalized mouse position into slider values"""
 
         # Map normalized x position to slider range, snapped to step increments
-        slider_x = (x_norm * self._slider_delta) + self._slider_min
-        slider_x = round(slider_x / self._slider_step) * self._slider_step
+        slider_x = self._slider_min + round(x_norm * self._slider_delta / self._slider_step) * self._slider_step
 
         # Finally, make sure the slider value doesn't go out of range
         return self._type(max(self._slider_min, min(self._slider_max, slider_x)))
@@ -188,7 +191,13 @@ class Slider(CachedBgFgElement):
             cv2.line(new_img, pt1, pt2, self.style.marker_color, self.style.marker_width, cv2.LINE_4)
 
         # Draw label
-        return self.style.bg_text.xy_norm(new_img, self._label, (0, 0.5), offset_xy_px=(5, 0))
+        return self.style.bg_text.xy_norm(
+            new_img,
+            self._label,
+            self.style.label_xy_norm,
+            anchor_xy_norm=self.style.label_anchor_xy_norm,
+            offset_xy_px=self.style.label_offset_xy_px,
+        )
 
     def _rerender_fg(self, bg_image: ndarray) -> ndarray:
 
@@ -239,6 +248,8 @@ class MultiSlider(CachedBgFgElement):
         indicator_width: int = 1,
         text_scale: float = 0.5,
         marker_step: float | None = None,
+        marker_origin: float | None = None,
+        typecast=None,
         enable_value_display: bool = True,
         fill_color: COLORU8 | int | None = None,
         height: int = 40,
@@ -247,7 +258,19 @@ class MultiSlider(CachedBgFgElement):
 
         # Force to list-type, so we can handle single values as if they are multi-values
         if isinstance(values, (int, float)):
-            values = tuple(values)
+            values = tuple([values])
+
+        # Figure out type casting, if not given, and apply to inputs
+        if typecast is None:
+            values_are_ints = all(int(val) == val for val in values)
+            range_is_int = all((int(val) == val for val in (min_val, max_val, step)))
+            typecast = np.int32 if (values_are_ints and range_is_int) else np.float32
+        if typecast is float:
+            typecast = np.float32
+        if typecast is int:
+            typecast = np.int32
+        values = [typecast(val) for val in values]
+        min_val, max_val, step = [typecast(val) for val in (min_val, max_val, step)]
 
         # Make sure the given values make sense
         is_int = all(isinstance(var, int) for var in [min_val, max_val, step])
@@ -263,9 +286,10 @@ class MultiSlider(CachedBgFgElement):
         self._slider_max = max_val
         self._slider_step = step
         self._slider_delta = max(self._slider_max - self._slider_min, 1e-9)
-        self._marker_x_norm = _get_norm_marker_positions(min_val, max_val, marker_step)
+        self._marker_x_norm = _get_norm_marker_positions(min_val, max_val, marker_step, marker_origin)
         self._max_precision = _get_step_precision(step)
         self._is_filled = fill_color is not None
+        self._type = typecast
 
         # Storage for slider state
         self._is_changed = True
@@ -291,6 +315,9 @@ class MultiSlider(CachedBgFgElement):
             fill_weight=0.5,
             fg_text=fg_text,
             bg_text=bg_text,
+            label_xy_norm=(0, 0.5),
+            label_anchor_xy_norm=None,
+            label_offset_xy_px=(5, 0),
             outline_color=(0, 0, 0),
         )
 
@@ -395,7 +422,7 @@ class MultiSlider(CachedBgFgElement):
         slider_x = round(slider_x / self._slider_step) * self._slider_step
         slider_x = max(self._slider_min, min(self._slider_max, slider_x))
 
-        return slider_x
+        return self._type(slider_x)
 
     # .................................................................................................................
 
@@ -410,7 +437,13 @@ class MultiSlider(CachedBgFgElement):
             cv2.line(new_img, pt1, pt2, self.style.marker_color, self.style.marker_width)
 
         # Draw label
-        return self.style.bg_text.xy_norm(new_img, self._label, (0, 0.5), offset_xy_px=(5, 0))
+        return self.style.bg_text.xy_norm(
+            new_img,
+            self._label,
+            self.style.label_xy_norm,
+            anchor_xy_norm=self.style.label_anchor_xy_norm,
+            offset_xy_px=self.style.label_offset_xy_px,
+        )
 
     def _rerender_fg(self, image: ndarray) -> ndarray:
 
@@ -465,25 +498,41 @@ class MultiSlider(CachedBgFgElement):
 def _get_norm_marker_positions(
     min_value: int | float,
     max_value: int | float,
-    marker_step: int | float,
+    marker_step: int | float | None,
+    marker_origin: int | float | None = None,
 ) -> ndarray:
     """
     Helper used to compute the location of slider marker indicators.
-    If steps_per_marker is None, then no markers will be returned
+    If marker_step is None, then no markers will be returned,
+    if marker_origin is None, then the min_value will be used.
+
+    As an example, assume we have min/max of: (3, 9), and a step of 2
+    With a marker_origin of None, we fallback to the min value (3) and
+    would get markers at: 3, 5, 7, 9
+    By comparison, a marker_origin of 0, gives markers at: 4, 6, 8
     """
 
     # Bail if we don't need steps
     if marker_step is None:
         return np.float32([])
 
-    # Figure out where the marker boundaries are
-    marker_min = marker_step * (min_value // marker_step)
-    marker_max = marker_step * (2 + (max_value // marker_step))
+    # Use min value as origin if not given (generally most intuitive behavior)
+    if marker_origin is None:
+        marker_origin = min_value
+
+    # Find left-/right-most marker values
+    mrk_min = marker_origin - round((marker_origin - min_value) / marker_step) * marker_step
+    mrk_max = marker_origin + round((max_value - marker_origin) / marker_step) * marker_step
+
+    # Make sure marker min/max is equal or within the value min/max range
+    if mrk_min < min_value:
+        mrk_min += marker_step
+    if mrk_max > max_value:
+        mrk_max -= marker_step
 
     # Calculate normalized marker coordinates for drawing
-    marker_pts = np.arange(marker_min, marker_max, marker_step, dtype=np.float32)
+    marker_pts = np.arange(mrk_min, mrk_max + marker_step, marker_step, dtype=np.float32)
     marker_x_norm = (marker_pts - min_value) / max(max_value - min_value, 1e-9)
-
     return marker_x_norm
 
 
