@@ -223,6 +223,12 @@ def smoothstep(edge0: float, edge1: float, x: ndarray | float) -> ndarray | floa
     return x * x * (3.0 - 2.0 * x)
 
 
-def lerp_cos(a: float, b: float, t: ndarray | float) -> ndarray | float:
+def lerp(value_t0, value_t1, t):
+    """Linear interpolation from value_t0 to value_t1"""
+    return value_t0 * (1.0 - t) + value_t1 * t
+
+
+def cosine_interp(value_t0, value_t1, t):
+    """Interpolation from value_t0 to value_t1 using a (non-linear) cosine curve"""
     weight = 0.5 - 0.5 * np.cos(t * np.pi)
-    return a * (1.0 - weight) + b * weight
+    return value_t0 * (1.0 - weight) + value_t1 * weight

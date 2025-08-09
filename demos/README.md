@@ -48,6 +48,19 @@ The UI includes support for interactive click-and-drag boxes. The built-in [sele
 **UI Elements:** FixedARImage, ZoomImage, Swapper, ToggleImageButton, EditBoxOverlay, DrawRectangleOverlay, VideoPlaybackSlider, PrefixedTextBlock
 
 
+## ocv_edge_detection.py
+
+This demo provides interactive control over multiple [edge detection algorithms](https://opencv.org/blog/edge-detection-using-opencv/) built into OpenCV, including [Sobel](https://en.wikipedia.org/wiki/Sobel_operator), [Laplacian](https://en.wikipedia.org/wiki/Discrete_Laplace_operator) and [Canny](https://en.wikipedia.org/wiki/Canny_edge_detector) edge detection, among others.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/3b75eedd-0b6e-4476-8f88-888bdd869f9a" style="width:400px">
+</p>
+
+This demo works on images, video or webcam inputs.
+
+**UI Elements:** FixedARImage, Swapper, RadioBar, ToggleButton, MultiSlider, TextCarousel, PrefixedTextBlock
+
+
 ## ocv_lowpass_filtering.py
 
 This demo provides interactive control over various [low-pass filtering](https://en.wikipedia.org/wiki/Low-pass_filter) (e.g. blurring) functions [built into OpenCV](https://docs.opencv.org/4.x/d4/d13/tutorial_py_filtering.html) and includes non-linear options like [morphological](https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html) and [Kuwahara](https://en.wikipedia.org/wiki/Kuwahara_filter) filtering.
