@@ -433,18 +433,18 @@ class RadioBar(CachedBgFgElement):
 
     def __init__(
         self,
-        *labels: str | float | int,
+        *labels: str | float | int | None,
         active_index: int = 0,
         color_on: COLORU8 = (95, 90, 75),
         color_off: COLORU8 | None = None,
         text_scale: float = 0.5,
         proportional_sizing: bool = False,
         label_padding: int = 2,
-        height: int = 40,
+        height: int = 60,
         is_flexible_w: bool = True,
     ):
 
-        self._labels = tuple(str(label) for label in labels)
+        self._labels = tuple(str(label) for label in labels if label is not None)
         self._cached_img = blank_image(1, 1)
         self._active_idx = active_index
         self._is_changed = True

@@ -814,19 +814,33 @@ class Swapper(BaseCallback):
 
     # .................................................................................................................
 
-    def __init__(self, *swap_items: BaseCallback, initial_index: int = 0, keys: Iterable[str] | None = None):
+    def __init__(self, *swap_items: BaseCallback, initial_index: int = 0, keys: Iterable[Any] | None = None):
 
-        self._items: tuple[BaseCallback] = tuple(swap_items)
+        # Fill in missing keys
+        swap_items = tuple(swap_items)
+        if keys is None:
+            keys = range(len(swap_items))
+        keys = tuple(keys)
+
+        # Set up per-item/key removal flag
+        is_none_keys = [k is None for k in keys]
+        is_none_items = [item is None for item in swap_items]
+        need_remove_list = [any(none_key_or_item) for none_key_or_item in zip(is_none_keys, is_none_items)]
+
+        items = tuple(item for item, remove in zip(swap_items, need_remove_list) if not remove)
+        keys = tuple(key for key, remove in zip(keys, need_remove_list) if not remove)
+        # reverse_key_lut = {item: key for item, key in zip(items, keys)}
+
+        # Sanity check
+        num_keys, num_items = len(keys), len(items)
+        assert len(set(keys)) == num_keys, f"Cannot have duplicate keys: {keys}"
+        assert num_keys == num_items, f"Number of keys ({num_keys}) must match number of swap items ({num_items})"
+
+        # Store items for swapping
+        self._items: tuple[BaseCallback] = items
         self._swap_idx: int = initial_index
         self._num_items: int = len(self._items)
-
-        # Set up key-lookup
-        if keys is None:
-            keys = {idx: idx for idx in range(self._num_items)}
-        assert (
-            len(keys) == self._num_items
-        ), f"Key mismatch! Number of keys ({len(keys)}) must match number of swap items ({self._num_items})"
-        self._key_lut = keys = {key: idx for idx, key in enumerate(keys)}
+        self._key_lut = {key: idx for idx, key in enumerate(keys)}
 
         item_rdr = self._items[initial_index]._cb_rdr
         super().__init__(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
@@ -863,12 +877,11 @@ class Swapper(BaseCallback):
 
     # .................................................................................................................
 
-    def next(self, increment=1):
+    def next(self, increment=1) -> BaseCallback:
         new_idx = (self._swap_idx + increment) % self._num_items
-        self.set_swap_index(new_idx)
-        return self
+        return self.set_swap_index(new_idx)
 
-    def prev(self, decrement=1):
+    def prev(self, decrement=1) -> BaseCallback:
         return self.next(-decrement)
 
     # .................................................................................................................
