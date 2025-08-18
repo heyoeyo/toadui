@@ -733,9 +733,9 @@ class OverlayStack(BaseCallback):
 
         # Clear overlay children, so we don't get duplicate base item calls
         # (only this parent instance will handle callbacks & pass these down to children)
-        self._cb_rdr = self._base_item._cb_rdr.copy()
+        self._cb_rdr = base_item._cb_rdr.copy()
         for olay in overlay_items:
-            olay._cb_rdr = self._base_item._cb_rdr.copy()
+            olay._cb_rdr = base_item._cb_rdr.copy()
             olay._cb_child_list.clear()
         self._overlay_items = tuple(overlay_items)
 
@@ -778,7 +778,7 @@ class OverlayStack(BaseCallback):
         self._base_item._cb_region.resize(x1, y1, x2, y2)
         for overlay in self._overlay_items:
             overlay._cb_region.resize(x1, y1, x2, y2)
-            base_frame = overlay._render_overlay(base_frame)
+            base_frame = overlay._render_overlay(base_frame) if overlay._enable_overlay_render else base_frame
 
         return base_frame
 

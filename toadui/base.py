@@ -450,6 +450,7 @@ class BaseOverlay(BaseCallback):
         stack item will
         """
         super().__init__(1, 1)
+        self._enable_overlay_render = True
         self._base_item = base_item
         if base_item is not None:
             if not suppress_callbacks_to_base:
@@ -462,6 +463,12 @@ class BaseOverlay(BaseCallback):
 
     def _render_overlay(self, frame: ndarray) -> ndarray:
         raise NotImplementedError(f"Must implement '_render_overlay' function ({self})")
+
+    # .................................................................................................................
+
+    def enable_render(self, enable_render: bool | None = None) -> SelfType:
+        self._enable_overlay_render = (not self._enable_overlay_render) if enable_render is None else enable_render
+        return self
 
     # .................................................................................................................
 
@@ -489,7 +496,7 @@ class BaseOverlay(BaseCallback):
         self._base_item._cb_region.resize(x1, y1, x2, y2)
         self._cb_region.resize(x1, y1, x2, y2)
 
-        return self._render_overlay(base_frame)
+        return self._render_overlay(base_frame) if self._enable_overlay_render else base_frame
 
     # .................................................................................................................
 
