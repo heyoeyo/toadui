@@ -12,13 +12,13 @@ import numpy as np
 
 from toadui.base import BaseCallback, BaseOverlay, CBEventXY, CBEventFlags
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.drawing import draw_normalized_polygon
+from toadui.helpers.drawing import draw_normalized_polygon, draw_circle_norm
 from toadui.helpers.text import TextDrawer
 
 # Typing
 from typing import NamedTuple
 from numpy import ndarray
-from toadui.helpers.types import COLORU8, XYPX, XYNORM, HWPX, XY1XY2NORM, SelfType
+from toadui.helpers.types import COLORU8, IMGSHAPE_HW, XYPX, XYNORM, HWPX, XY1XY2NORM, XY1XY2PX, SelfType, IsLMR
 from toadui.helpers.ocv_types import OCVInterp, OCVLineType, OCVFont
 
 
@@ -315,6 +315,232 @@ class TextOverlay(BaseOverlay):
             return frame
 
         return self.style.text.xy_norm(frame, self._text, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px)
+
+    # .................................................................................................................
+
+
+class MousePaintOverlay(BaseOverlay):
+    """
+    Overlay used to allow for 'painting' over a base item.
+    Supports left/middle/right click painting.
+
+    Note that this overlay does not try to manage accumulated
+    painting data. Instead, painting data is 'reset' every time
+    a user finishes, and it is up to the code calling the overlay
+    to manage the painted trail data as needed.
+    This is handled through the 'read_trail()' function:
+
+        # Read trail data
+        is_trail_finished, trail_xy_norm lmr_index = overlay.read()
+
+        # Handle storage/plotting of trail data
+        if is_trail_finished:
+            some_data_storage.append(trail_xy_norm)
+        else:
+            draw_trail_in_progress(trail_xy_norm)
+        ...etc...
+    """
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        base_item: BaseCallback,
+        enable_hover_indicator: bool = True,
+        enable_render: bool = True,
+        allow_left_click: bool = True,
+        allow_middle_click: bool = False,
+        allow_right_click: bool = False,
+    ):
+
+        # Allocate storage for mouse press/change state for left/middle/right click
+        self._is_lmr_pressed = [False, False, False]
+        self._is_lmr_changed = [False, False, False]
+        self._allow_lmr = (allow_left_click, allow_middle_click, allow_right_click)
+
+        # Storage for current paint trail details
+        self._curr_cbxy = CBEventXY.default()
+        self._trail = []
+        self._trail_lmr = 0
+        self._brush_rad_norm = 0.1
+        self._is_trail_in_progress = False
+
+        # Set rendering state
+        self._enable_hover_indicator = enable_hover_indicator
+        self.enable_render(enable_render)
+
+        # Configure styling of overlay graphics
+        self.style = UIStyle(
+            color_left_paint=(0, 255, 255),
+            color_right_paint=(0, 0, 255),
+            color_middle_paint=(255, 0, 255),
+            color_hover_fg=(0, 255, 255),
+            color_hover_bg=(0, 115, 115),
+            thickness_hover_fg=1,
+            thickness_hover_bg=2,
+            hover_line_type=cv2.LINE_AA,
+            paint_line_type=cv2.LINE_AA,
+        )
+
+        # Inherit from parent
+        super().__init__(base_item)
+
+    # .................................................................................................................
+
+    def read_mouse_xy(self) -> tuple[IsLMR, IsLMR, CBEventXY]:
+        """Returns: is_dragging, current_event_xy, previous_event_xy"""
+        is_lmr_pressed = IsLMR(*self._is_lmr_pressed)
+        is_lmr_changed = IsLMR(*self._is_lmr_changed)
+        self._is_lmr_changed = [False, False, False]
+        return is_lmr_changed, is_lmr_pressed, self._curr_cbxy
+
+    def read_trail(self) -> tuple[bool, list[XYNORM], int]:
+        """
+        Read current trail data, returns xy coordinates & left/middle/right click index.
+
+        Note: if the user has has just 'finished' painting,
+        then the trail data read from this function will be deleted.
+        It is up to the code calling this function to manage/store the
+        painted trail data over time!
+
+        Returns:
+            is_trail_finished, trail_xy_norm_list, lmr_index
+
+        - lmr_index is a value of 0 (left), 1 (middle) or 2 (right), representing the mouse click used to paint
+        """
+
+        trail_xy_norm = self._trail
+        is_trail_finished = len(trail_xy_norm) > 0 and (not self._is_trail_in_progress)
+        if is_trail_finished:
+            self._trail = []
+
+        return is_trail_finished, trail_xy_norm, self._trail_lmr
+
+    def clear(self) -> SelfType:
+        """Wipe out any existing trail data and mouse-press state"""
+        self._trail = []
+        self._is_trail_in_progress = False
+        self._is_lmr_changed = [pressed != False for pressed in self._is_lmr_pressed]
+        self._is_lmr_pressed = [False, False, False]
+        return self
+
+    def set_brush_size(self, size_norm: float) -> SelfType:
+        """Update paint brush sizing. Note that sizing cannot be changed mid-paint!"""
+        self._brush_rad_norm = size_norm * 0.5
+        return self
+
+    # .................................................................................................................
+
+    def _on_mouse_down(self, cbxy: CBEventXY, cbflags: CBEventFlags, lmr_index: int):
+
+        # Don't register clicks outside of overlay
+        if not cbxy.is_in_region:
+            return
+
+        # Don't begin new trail if we're already painting
+        if self._is_trail_in_progress:
+            return
+
+        # Bail on left/middle/right click if not allowed
+        if not self._allow_lmr[lmr_index]:
+            return
+
+        self._curr_cbxy = cbxy
+        self._is_lmr_pressed[lmr_index] = True
+        self._is_lmr_changed[lmr_index] = True
+        self._is_trail_in_progress = True
+        self._trail_lmr = lmr_index
+
+        self._trail.append(cbxy.xy_norm)
+
+        return
+
+    def _on_mouse_up(self, cbxy: CBEventXY, cbflags: CBEventFlags, lmr_index: int):
+        # Only register mouse-up if the mouse was recorded as down previously!
+        # -> Need this because we ignore down-events when another button is already pressed
+        # -> So not guaranteed down-up pairing
+        is_changed = self._is_lmr_pressed[lmr_index]
+        if is_changed:
+            self._curr_cbxy = cbxy
+            self._is_lmr_changed[lmr_index] = True
+            self._is_lmr_pressed[lmr_index] = False
+            self._is_trail_in_progress = False
+        return
+
+    def _on_left_down(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+        self._on_mouse_down(cbxy, cbflags, 0)
+
+    def _on_middle_down(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+        self._on_mouse_down(cbxy, cbflags, 1)
+
+    def _on_right_down(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+        self._on_mouse_down(cbxy, cbflags, 2)
+
+    def _on_left_up(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+        self._on_mouse_up(cbxy, cbflags, 0)
+
+    def _on_middle_up(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+        self._on_mouse_up(cbxy, cbflags, 1)
+
+    def _on_right_up(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+        self._on_mouse_up(cbxy, cbflags, 2)
+
+    def _on_move(self, cbxy: CBEventXY, cbflags: CBEventFlags):
+
+        self._curr_cbxy = cbxy
+        if self._is_trail_in_progress:
+            self._trail.append(cbxy.xy_norm)
+
+        return
+
+    # .................................................................................................................
+
+    def _render_overlay(self, frame: ndarray) -> ndarray:
+
+        # Copy frame so we don't modify original (in case original is being re-used)
+        out_frame = frame.copy()
+
+        # Get brush sizing for both circle (radius) and line (thickness) drawing
+        brush_radius_px = self._brush_rad_norm * min(out_frame.shape[0:2])
+        brush_thick_px = 2 * brush_radius_px
+        brush_radius_px, brush_thick_px = [round(value) for value in (brush_radius_px, brush_thick_px)]
+
+        # Draw trail
+        have_trail_data = len(self._trail) > 0
+        if have_trail_data:
+
+            # Pick color based on which mouse button is painting
+            color = self.style.color_left_paint
+            if self._trail_lmr == 1:
+                color = self.style.color_middle_paint
+            elif self._trail_lmr == 2:
+                color = self.style.color_right_paint
+
+            # Draw current paint trail, if we have a valid color
+            if color is not None:
+                line_type = self.style.paint_line_type
+                num_xy = len(self._trail)
+                if num_xy == 1:
+                    xy_cen = self._trail[0]
+                    thickness = -1
+                    draw_circle_norm(out_frame, xy_cen, brush_radius_px, color, thickness, line_type)
+                elif num_xy > 1:
+                    bg_col, is_closed = None, False
+                    draw_normalized_polygon(out_frame, self._trail, color, brush_thick_px, bg_col, line_type, is_closed)
+
+        # Draw hover indicator (i.e. circle used to indicate mouse painting position)
+        if self._enable_hover_indicator and self._curr_cbxy.is_in_region:
+            xy_cen = self._curr_cbxy.xy_norm
+            line_type = self.style.hover_line_type
+            if self.style.color_hover_bg is not None:
+                bg_col = self.style.color_hover_bg
+                bg_thick = self.style.thickness_hover_bg
+                draw_circle_norm(out_frame, xy_cen, brush_radius_px, bg_col, bg_thick, line_type)
+            fg_col = self.style.color_hover_fg
+            fg_thick = self.style.thickness_hover_fg
+            draw_circle_norm(out_frame, xy_cen, brush_radius_px, fg_col, fg_thick, line_type)
+
+        return out_frame
 
     # .................................................................................................................
 
@@ -765,6 +991,7 @@ class EditBoxOverlay(BaseOverlay):
         interaction_distance_px: float = 50,
         minimum_box_area_norm: float = 5e-5,
         frame_shape: HWPX | None = None,
+        allow_right_click_clear=True,
     ):
         # Inherit from parent
         super().__init__(base_item)
@@ -774,6 +1001,7 @@ class EditBoxOverlay(BaseOverlay):
         self._y_norms = np.float32([0.2, 0.5, 0.8])
         self._prev_xy_norms = (self._x_norms, self._y_norms)
         self._is_changed = True
+        self._allow_right_click_clear = allow_right_click_clear
 
         # Store indexing used to specify which of the box points is being modified, if any
         self._is_modifying = False
@@ -901,6 +1129,28 @@ class EditBoxOverlay(BaseOverlay):
 
     # .................................................................................................................
 
+    @classmethod
+    def xy1xy2_norm_to_px(cls, image_shape: IMGSHAPE_HW, box_xy1xy2_norm: XY1XY2NORM) -> XY1XY2PX:
+        """
+        Helper used to convert from normalized xy1xy2 coordinates to pixel coordinates
+        Returns:
+            ((x1_px, y1_px), (x2_px, y2_px))
+        """
+
+        # For convenience
+        img_h, img_w = image_shape[0:2]
+        x_scale = img_w - 1
+        y_scale = img_h - 1
+
+        # Compute coords in pixel units
+        xy1_norm, xy2_norm = box_xy1xy2_norm
+        xy1_px = (round(xy1_norm[0] * x_scale), round(xy1_norm[1] * y_scale))
+        xy2_px = (round(xy2_norm[0] * x_scale), round(xy2_norm[1] * y_scale))
+
+        return (xy1_px, xy2_px)
+
+    # .................................................................................................................
+
     def _on_move(self, cbxy: CBEventXY, cbflags: CBEventFlags):
         # Record mouse position for rendering 'closest point' indicator on hover
         self._mouse_xy_norm = cbxy.xy_norm
@@ -976,7 +1226,8 @@ class EditBoxOverlay(BaseOverlay):
         return
 
     def _on_right_click(self, cbxy: CBEventXY, cbflags: CBEventFlags):
-        self.clear()
+        if self._allow_right_click_clear:
+            self.clear()
         return
 
     # .................................................................................................................

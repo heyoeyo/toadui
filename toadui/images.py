@@ -14,20 +14,9 @@ from toadui.helpers.sizing import get_image_hw_to_fit_region, get_image_hw_to_fi
 from toadui.helpers.styling import UIStyle
 
 # For type hints
-from typing import NamedTuple
 from numpy import ndarray
-from toadui.helpers.types import HWPX, SelfType, XYNORM, XYPX
+from toadui.helpers.types import HWPX, SelfType, XYNORM, XYPX, IsLMR
 from toadui.helpers.ocv_types import OCVInterp
-
-
-# ---------------------------------------------------------------------------------------------------------------------
-# %% Types
-
-
-class IsLMR(NamedTuple):
-    left: bool
-    middle: bool
-    right: bool
 
 
 # ---------------------------------------------------------------------------------------------------------------------

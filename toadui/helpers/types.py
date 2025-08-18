@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
-from typing import NamedTuple, TypeAlias, Callable
+from typing import NamedTuple, TypeAlias, Callable, Any
 
 try:
     from typing import Self
@@ -30,6 +30,18 @@ class XYPairNorm(NamedTuple):
 class HWPairPX(NamedTuple):
     h: int
     w: int
+
+
+class LMRData(NamedTuple):
+    left: Any
+    middle: Any
+    right: Any
+
+
+class IsLMR(NamedTuple):
+    left: bool
+    middle: bool
+    right: bool
 
 
 # ---------------------------------------------------------------------------------------------------------------------

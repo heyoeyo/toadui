@@ -5,7 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
-from collections import OrderedDict
+from collections import OrderedDict, deque
 
 # For type hints
 from typing import Any
@@ -47,8 +47,7 @@ class ToggleStateTracker:
         self._is_changed = is_changed
         return self
 
-
-# .....................................................................................................................
+    # .................................................................................................................
 
 
 class ValueChangeTracker:
@@ -58,6 +57,8 @@ class ValueChangeTracker:
     only triggering events on value changes, rather than
     just the state value.
     """
+
+    # .................................................................................................................
 
     def __init__(self, initial_value: Any = None):
         self._prev = initial_value
@@ -72,8 +73,7 @@ class ValueChangeTracker:
         is_changed, self._prev = (self._prev != new_value), new_value
         return is_changed
 
-
-# .....................................................................................................................
+    # .................................................................................................................
 
 
 class DelayableValueChangeTracker:
@@ -172,6 +172,98 @@ class MaxLengthKVStorage:
     def get(self, key: Any, value_if_missing: Any = None) -> Any:
         """Retrieve item from storage"""
         return self.data.get(key, value_if_missing)
+
+    # .................................................................................................................
+
+
+class UndoRedoList:
+    """
+    Class used to implement a basic list-like storage object
+    that is capable of undo/redo/clear operations.
+    """
+
+    # Flags used to store which actions have been taken
+    _ACT_APPEND = 0
+    _ACT_CLEAR = 1
+
+    # .................................................................................................................
+
+    def __init__(self, max_undos=50, allow_undo_clear=True):
+        self._data_list = []
+        self._forward_actions = deque([], maxlen=max_undos)
+        self._backward_actions = []
+        self._allow_undo_clear = allow_undo_clear
+
+    def __repr__(self):
+        name = self.__class__.__name__
+        num_data = len(self._data_list)
+        num_undos = len(self._backward_actions)
+        return f"{name} ({num_data} data, {num_undos} undos)"
+
+    def __len__(self):
+        return len(self._data_list)
+
+    def __iter__(self):
+        return iter(self._data_list)
+
+    # .................................................................................................................
+
+    def append(self, data):
+        """Store new data entry"""
+        self._forward_actions.append((self._ACT_APPEND, None))
+        self._data_list.append(data)
+        self._backward_actions = []
+        return self
+
+    def clear(self) -> bool:
+        """Clear current data. Returns: had_data_to_clear"""
+        have_data_to_clear = len(self._data_list) > 0
+        if have_data_to_clear:
+            if self._allow_undo_clear:
+                self._forward_actions.append((self._ACT_CLEAR, self._data_list))
+            else:
+                self._forward_actions.clear()
+            self._data_list = []
+            self._backward_actions = []
+        return have_data_to_clear
+
+    # .................................................................................................................
+
+    def undo(self) -> bool:
+        """Reverse last action (e.g. append or clear). Returns: had_action_to_undo"""
+        have_action_to_undo = len(self._forward_actions) > 0
+        if have_action_to_undo:
+            command, data = self._forward_actions.pop()
+            if command == self._ACT_APPEND:
+                assert data is None, f"Error with undo-append. Expecting no data, got: {data}"
+                data = self._data_list.pop()
+            elif command == self._ACT_CLEAR:
+                self._data_list = data
+                data = None
+            self._backward_actions.append((command, data))
+        return have_action_to_undo
+
+    def redo(self) -> bool:
+        """Redo last undo. Returns: had_action_to_redo"""
+        have_action_to_redo = len(self._backward_actions) > 0
+        if have_action_to_redo:
+            command, data = self._backward_actions.pop()
+            if command == self._ACT_APPEND:
+                self._data_list.append(data)
+                data = None
+            elif command == self._ACT_CLEAR:
+                assert data is None, f"Error with redo-clear. Expecting no data, got: {data}"
+                data = self._data_list
+                self._data_list = []
+            self._forward_actions.append((command, data))
+        return have_action_to_redo
+
+    def reset(self):
+        """Fully resets data (i.e. clear without the ability to undo)"""
+        self._data_list = []
+        self._forward_actions.clear()
+        self._backward_actions = []
+        return self
 
     # .................................................................................................................
 

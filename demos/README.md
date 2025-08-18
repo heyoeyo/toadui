@@ -61,6 +61,18 @@ This demo works on images, video or webcam inputs.
 **UI Elements:** FixedARImage, Swapper, RadioBar, ToggleButton, MultiSlider, TextCarousel, PrefixedTextBlock
 
 
+## ocv_grabcut.py
+
+This demo provides a fully interactive version of the OpenCV implementation of the [GrabCut algorithm](https://docs.opencv.org/4.x/dd/dfc/tutorial_js_grabcut.html).
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/f10949d2-6627-494b-bcd0-91db914f9b0a">
+</p>
+
+The UI includes support for segmenting parts of an image using bounding boxes as well as 'paint strokes' to indicate foreground/background regions. Both the box selection and painting are built directly into this demo, and so do not require the use of third party painting tools to generate masks, as is done in the [OpenCV documentation](https://docs.opencv.org/3.4/d8/d83/tutorial_py_grabcut.html). Note that while this demo provides a sense of how the grabcut algorithm behaves, this is not an especially good technique for object segmentation nowadays. For example, in many use cases [tools](https://github.com/heyoeyo/muggled_sam?tab=readme-ov-file#run-image) using something like [Segment-Anything](https://github.com/facebookresearch/sam2) will be both faster and more accurate.
+
+**UI Elements:** FixedARImage, Slider, OverlayStack, EditBoxOverlay, MousePaintOverlay
+
 ## ocv_lowpass_filtering.py
 
 This demo provides interactive control over various [low-pass filtering](https://en.wikipedia.org/wiki/Low-pass_filter) (e.g. blurring) functions [built into OpenCV](https://docs.opencv.org/4.x/d4/d13/tutorial_py_filtering.html) and includes non-linear options like [morphological](https://docs.opencv.org/4.x/d9/d61/tutorial_py_morphological_ops.html) and [Kuwahara](https://en.wikipedia.org/wiki/Kuwahara_filter) filtering.
