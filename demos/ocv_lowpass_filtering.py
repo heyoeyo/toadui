@@ -96,12 +96,12 @@ time_txt = PrefixedTextBlock("", "-", " ms")
 
 # Box blur UI
 bblur_ksize_slider = Slider("Kernel Size", 3, 1, 50, step=1)
-bblur_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05)
+bblur_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05, marker_step=1)
 bblur_ui = HStack(bblur_ksize_slider, bblur_aradj_slider)
 
 # Gaussian blur UI
 gblur_ksize_slider = Slider("Kernel Size", 3, 0, 50, step=1)
-gblur_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05)
+gblur_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05, marker_step=1)
 gblur_sigma_slider = Slider("Gaussian Sigma", 0, 0, 25, step=0.25)
 gblur_use_sigma_sizing_btn = ToggleButton("Use sigma sizing")
 gblur_ui = HStack(gblur_ksize_slider, gblur_aradj_slider, gblur_sigma_slider)
@@ -119,7 +119,7 @@ medianblur_ui = HStack(mblur_ksize_slider, mblur_iter_slider)
 
 # Morphological filter UI
 morpho_ksize_slider = Slider("Kernel Size", 5, 1, 50, step=1)
-morpho_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05)
+morpho_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05, marker_step=1)
 morpho_iter_slider = Slider("Iterations", 1, 1, 50, step=1)
 morpho_operation_menu = TextCarousel(morpho_ops_lut)
 morpho_shape_menu = TextCarousel(morpho_shapes_lut)
@@ -130,19 +130,19 @@ morpho_ui = VStack(
 
 # Kuwahara UI
 kuwa_winsize_slider = Slider("Window Size", 3, 0, 21, step=1)
-kuwa_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05)
+kuwa_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05, marker_step=1)
 kuwa_iter_slider = Slider("Iterations", 1, 1, 5, step=1)
 kuwahara_ui = HStack(kuwa_winsize_slider, kuwa_aradj_slider, kuwa_iter_slider)
 
 # Dirty blur UI
 dblur_strength_slider = Slider("Blur Strength", 3, 0, 50, step=0.1)
-dblur_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05)
+dblur_aradj_slider = Slider("Aspect Adjust", 0, -1, 1, step=0.05, marker_step=1)
 dblur_seed_slider = Slider("Random Seed", 50, 0, 100, step=1)
 dirtyblur_ui = HStack(dblur_strength_slider, dblur_aradj_slider, dblur_seed_slider)
 
 # Build filter selection & swapper used to switch controls
 radio_labels = ("Box", "Gaussian", "Bilateral", "Median", "Morpho", "Kuwahara", "Dirty")
-filter_select = RadioBar(*radio_labels, height=60).set_label("Morpho")
+filter_select = RadioBar(*radio_labels).set_label("Morpho")
 swap_filter_ctrls_ui = Swapper(
     bblur_ui,
     gblur_ui,
@@ -191,7 +191,7 @@ print("- Right click sliders to reset values")
 cv2.setNumThreads(cv2.getNumberOfCPUs() // 2)
 
 # Set up morphological kernel on startup, to ensure it exists for first-use
-morpho_kernel = cv2.getStructuringElement(cv2.MORPH_DILATE, (1, 1))
+morpho_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (1, 1))
 with window.auto_close(vreader.release):
 
     for is_paused, frame_idx, frame in vreader:
@@ -268,7 +268,8 @@ with window.auto_close(vreader.release):
             is_morpho_shape_changed, _, morpho_shape = morpho_shape_menu.read()
 
             if morpho_ksize > 1:
-                if is_morpho_shape_changed or is_morpho_ksize_changed or is_morpho_aradj_changed:
+                kernel_is_changed = any((is_morpho_shape_changed, is_morpho_ksize_changed, is_morpho_aradj_changed))
+                if is_filter_changed or kernel_is_changed:
                     max_y = 1 + int(morpho_shape == cv2.MORPH_ELLIPSE)  # weird bug in opencv?
                     morpho_xy = get_xy_with_ar_adjustment(morpho_ksize, morpho_aradj)
                     morpho_xy = (max(1, morpho_xy[0]), max(max_y, morpho_xy[1]))

@@ -35,7 +35,7 @@ from numpy import ndarray
 default_initial_size = 256
 default_max_size = 1024
 default_aspect_ratio = 1
-default_seed = 1186804540
+default_seed = None
 default_display_size = 900
 default_framerate = 60
 default_image_path = None

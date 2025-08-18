@@ -131,7 +131,7 @@ window.close()
 ```
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/33ab98ba-71a6-43fb-b247-e66e33b37baa" style="height:300px">
+  <img src="https://github.com/user-attachments/assets/33ab98ba-71a6-43fb-b247-e66e33b37baa" style="width:400px">
 </p>
 
 The result is a simple video player with playback control via click-and-drag. The video can be paused/unpaused by pressing the spacebar or the included button next to the playback slider. A slightly more sophisticated implementation can be found in the [demos](https://github.com/heyoeyo/toadui/tree/main/demos#video_playbackpy).
