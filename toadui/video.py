@@ -829,7 +829,7 @@ def check_is_image(file_path: str | ndarray) -> bool:
 
 def load_looping_video_or_image(
     video_or_image_path: str | ndarray, display_size_px: int | None = None
-) -> LoopingVideoReader | ImageAsVideoReader:
+) -> tuple[bool, LoopingVideoReader | ImageAsVideoReader]:
     """
     Helper used to load either a 'image as video' or looping video reader.
     This can be used to support having a video input while also supporting

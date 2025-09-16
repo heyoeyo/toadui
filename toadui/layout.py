@@ -214,7 +214,7 @@ class VStack(BaseCallback):
 
     def __init__(
         self,
-        *items: BaseCallback,
+        *items: BaseCallback | None,
         flex: tuple | None = None,
         min_h: int | None = None,
         error_on_size_constraints: bool = False,

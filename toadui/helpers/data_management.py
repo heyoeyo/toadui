@@ -206,6 +206,9 @@ class UndoRedoList:
     def __iter__(self):
         return iter(self._data_list)
 
+    def __getitem__(self, index: int):
+        return self._data_list[index]
+
     # .................................................................................................................
 
     def append(self, data):

@@ -42,6 +42,8 @@ def interpret_coloru8(color: COLORU8 | int | float | None, fallback_color=None) 
     # Convert to tuple of 3 integers
     if not isinstance(out_color, Iterable):
         out_color = (out_color, out_color, out_color)
+    elif len(out_color) == 1:
+        out_color = (out_color[0], out_color[0], out_color[0])
     return tuple(int(min(255, max(0, round(val)))) for val in out_color)
 
 
