@@ -97,6 +97,19 @@ The UI provides a one-to-one mapping of the OpenCV function arguments (obscure t
 
 **UI Elements:** ToggleButton, Slider, PrefixedTextBlock, HoverLabelOverlay
 
+## video_fft.py
+
+This demo runs a live 2D [FFT](https://en.wikipedia.org/wiki/Fast_Fourier_transform) visualization on images, videos or webcams.
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/232a25fc-6027-48f8-90c7-55fe0c5ade1b">
+</p>
+
+The visualization includes a toggle to switch between showing the [magnitude or phase](https://www.comm.utoronto.ca/dkundur/course_info/signals/notes/Kundur_FourierMagPhase.pdf) result. It also allows for basic painting over top of the magnitude and/or phase plots, while displaying the effect (after performing an inverse FFT) on the input image.
+
+**UI Elements:** FixedARImage, Swapper, RadioBar, ColorSlider, MousePaintOverlay
+
+
 ## video_playback.py
 
 This demo runs a simple video player UI. It's a good starter template for UIs involving video (or webcam) inputs.

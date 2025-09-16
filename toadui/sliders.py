@@ -18,6 +18,7 @@ from toadui.helpers.drawing import draw_box_outline
 # Typing
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType
+from typing import Iterable
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -85,8 +86,10 @@ class Slider(CachedBgFgElement):
         # Set up element styling
         self.style = UIStyle(
             color=color,
-            indicator_width=indicator_width,
-            indicator_color=fg_color,
+            indicator_width_fg=indicator_width,
+            indicator_width_bg=indicator_width * 2,
+            indicator_color_fg=fg_color,
+            indicator_color_bg=pick_contrasting_gray_color(fg_color),
             marker_color=lerp_colors(fg_color, color, 0.85),
             marker_width=1,
             marker_pad=5,
@@ -209,7 +212,8 @@ class Slider(CachedBgFgElement):
         slider_norm = (self._slider_value - self._slider_min) / self._slider_delta
         line_x_px = round(slider_norm * max_x_px)
         pt1, pt2 = (line_x_px, 0), (line_x_px, img_h)
-        new_img = cv2.line(bg_image, pt1, pt2, self.style.indicator_color, self.style.indicator_width)
+        new_img = cv2.line(bg_image, pt1, pt2, self.style.indicator_color_bg, self.style.indicator_width_bg)
+        new_img = cv2.line(bg_image, pt1, pt2, self.style.indicator_color_fg, self.style.indicator_width_fg)
 
         # Draw text beside indicator line to show current value if needed
         if self._enable_value_display:
@@ -307,7 +311,9 @@ class MultiSlider(CachedBgFgElement):
         self.style = UIStyle(
             color=color,
             indicator_width=indicator_width,
-            indicator_color=fg_color,
+            indicator_width_bg=indicator_width * 2,
+            indicator_color_fg=fg_color,
+            indicator_color_bg=pick_contrasting_gray_color(fg_color),
             marker_color=lerp_colors(fg_color, color, 0.85),
             marker_width=1,
             marker_pad=5,
@@ -473,7 +479,8 @@ class MultiSlider(CachedBgFgElement):
             value_norm = (value - self._slider_min) / self._slider_delta
             line_x_px = round(value_norm * max_x_px)
             pt1, pt2 = (line_x_px, 0), (line_x_px, img_h)
-            image = cv2.line(image, pt1, pt2, self.style.indicator_color, self.style.indicator_width)
+            image = cv2.line(image, pt1, pt2, self.style.indicator_color_bg, self.style.indicator_width_bg)
+            image = cv2.line(image, pt1, pt2, self.style.indicator_color_fg, self.style.indicator_width_fg)
 
             # Draw text beside indicator line to show current value if needed
             if self._enable_value_display:
@@ -487,6 +494,107 @@ class MultiSlider(CachedBgFgElement):
                 self.style.fg_text.xy_norm(image, value_str, (value_norm, 0.5), anchor_xy_norm, offset_xy_px)
 
         return draw_box_outline(image, self.style.outline_color)
+
+    # .................................................................................................................
+
+
+class ColorSlider(Slider):
+    """
+    Helper used to implement a slider that shows a colormap as a background
+    The background can be provided directly as an Nx1 or Nx3 numpy array,
+    where N is the number of colors and the x1 or x3 corresponds to grayscale
+    or BGR values, respectively. Also works with colormap LUT shape (1xNx3).
+    Note that if a non-none value of 'steps' is given, then the color array
+    will be resized to have 'steps' number of entries!
+
+    Alternatively, colors can be given as a list of grayscale or BGR values,
+    in which case the slider will linearly interpolate to produce a background
+    with 'steps' number of entries.
+    """
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        label: str | None,
+        colors: ndarray | Iterable = ((0, 0, 0), (0, 128, 255)),
+        initial_position_norm: float = 0.5,
+        num_steps: int | None = 256,
+        indicator_width: int = 1,
+        text_scale: float = 0.5,
+        height: int = 40,
+        minimum_width: int = 64,
+        interpolation=cv2.INTER_LINEAR,
+    ):
+
+        # Force into array type
+        given_color_lut = isinstance(colors, ndarray)
+        if not given_color_lut:
+            colors = np.array(colors)
+
+        # Try to force colors array into Nx1 or Nx3 shape
+        if colors.ndim >= 3:
+            colors = np.squeeze(colors)
+        if colors.ndim == 1:
+            colors = np.expand_dims(colors, axis=-1)
+        assert colors.ndim == 2, "Error! Cannot interpret colors input shape. Expecting Nx3 or Nx1"
+        assert colors.shape[1] in (1, 3), "Error! Cannot interpret colors input shape. Expecting Nx3 or Nx1"
+
+        # Interpolate color steps, if needed
+        num_colors, num_ch = colors.shape[0:2]
+        num_steps = num_colors if num_steps is None else num_steps
+        if num_colors != num_steps:
+            x_interp = np.arange(num_steps)
+            x_given = np.linspace(0, 255, num_colors)
+            interp_ch = [np.interp(x_interp, x_given, colors[:, ch_idx]) for ch_idx in range(num_ch)]
+            colors = np.stack(interp_ch, axis=-1)
+        assert num_steps > 2, "Error! Color slider must have at least 2 color steps"
+
+        # Force internal color array to BGR for use in display
+        is_grayscale = num_ch == 1
+        if is_grayscale:
+            colors = colors.repeat(3, axis=-1)
+        self._colors_1px_img = np.round(np.expand_dims(colors, axis=0)).astype(np.uint8)
+        self._interpolation = interpolation
+        self._is_grayscale = is_grayscale
+
+        # Initialize from parent
+        low_color = self._colors_1px_img[0, 0, :]
+        label = label if label is not None else ""
+        slider_step_size = 1.0 / (num_steps - 1)
+        super().__init__(
+            label,
+            value=initial_position_norm,
+            min_val=0,
+            max_val=1,
+            step=slider_step_size,
+            color=low_color,
+            enable_value_display=False,
+        )
+
+    # .................................................................................................................
+
+    def read(self) -> tuple[bool, float, int | COLORU8]:
+        """Read current slider value. Returns: is_changed, slider_position_norm, color_select"""
+        is_changed, slider_pos_norm = super().read()
+        idx_select = round(slider_pos_norm * (self._colors_1px_img.shape[1] - 1))
+        color_select = self._colors_1px_img[0, idx_select, :].tolist()
+        color_select = color_select[0] if self._is_grayscale else color_select
+        return is_changed, slider_pos_norm, color_select
+
+    # .................................................................................................................
+
+    def _rerender_bg(self, h: int, w: int) -> ndarray:
+
+        # Draw color bar with label
+        new_img = cv2.resize(self._colors_1px_img, dsize=(w, h), interpolation=self._interpolation)
+        return self.style.bg_text.xy_norm(
+            new_img,
+            self._label,
+            self.style.label_xy_norm,
+            anchor_xy_norm=self.style.label_anchor_xy_norm,
+            offset_xy_px=self.style.label_offset_xy_px,
+        )
 
     # .................................................................................................................
 
@@ -555,7 +663,6 @@ def _get_step_precision(slider_step_size: int | float) -> int:
     if num_dec_places >= 7:
         num_trunc = 2
         num_places_truncated = len(step_dec_str[:-num_trunc].rstrip("0"))
-        print(step_as_str, num_dec_places, num_places_truncated)
         is_much_smaller = 0 < num_places_truncated < (num_dec_places - num_trunc)
         if is_much_smaller:
             num_dec_places = num_places_truncated

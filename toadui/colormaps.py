@@ -358,19 +358,21 @@ def make_tree_colormap(num_samples=256) -> ndarray:
 # .....................................................................................................................
 
 
-def make_wa_rainbow_colormap(num_samples=256) -> ndarray:
+def make_wa_rainbow_colormap(num_samples=256, phase_norm=0) -> ndarray:
     """
     Wrap-around rainbow colormap with pastel-like coloring.
     This is meant as an alternative to the built-in
     opencv rainbow colormap, which does not wrap-around.
     (wrap-around can be useful for plotting cyclical values)
 
+    Returns:
+        colormap_array (1xNx3, where N is number of samples)
+
     Note that this mapping starts/ends with a blue color!
-    The starting color (e.g. 'phase') of the colormap can be altered using:
-        rbow = make_rainbow_colormap()
-        phase = round(rbow.shape[1] * 0.5)   # Change 0.5 for different offsets
-        shifted_rbow = np.roll(rbow, shift=phase, axis=1)
-    -> Use a shift of 32 (256//8) to have the map start at red
+    The starting color (e.g. 'phase') of the colormap can be
+    altered using the phase_norm input.
+    For example, using a phase_norm value of 1/3 will give a
+    colormap starting/ending at red.
 
     Based on an article by Inigo Quilez:
     https://iquilezles.org/articles/palettes/
@@ -381,7 +383,7 @@ def make_wa_rainbow_colormap(num_samples=256) -> ndarray:
     brightness = 0.6
     saturation = 0.5
 
-    angle = np.linspace(0, 1, num_samples, endpoint=False, dtype=np.float32)
+    angle = np.linspace(0, 1, num_samples, endpoint=False, dtype=np.float32) + phase_norm
     rval = brightness + saturation * np.cos(twopi * (angle + 2 / 3))
     gval = brightness + saturation * np.cos(twopi * (angle + 1 / 3))
     bval = brightness + saturation * np.cos(twopi * (angle + 0 / 3))
@@ -390,6 +392,24 @@ def make_wa_rainbow_colormap(num_samples=256) -> ndarray:
     bgr_cmap = np.clip(np.dstack((bval, gval, rval)), 0, 1)
     bgr_cmap = np.round(255 * bgr_cmap).astype(np.uint8)
     return adjust_colormap_gamma(bgr_cmap, 0.75)
+
+
+def make_hsv_rainbow_colormap(num_samples=256) -> ndarray:
+    """
+    Function which creates a highly saturated rainbow
+    colormap using the HSV colorspace.
+    This is very nearly a wrap-around mapping, except
+    for duplicated values at the end points.
+
+    Returns:
+        colormap_array (1xNx3, where N is number of samples)
+    """
+
+    hsv_array = np.full((1, num_samples, 3), 255, dtype=np.uint8)
+    hsv_array[:, :, 0] = np.round(np.linspace(0, 255, num_samples)).astype(np.uint8)
+    bgr_cmap = cv2.cvtColor(hsv_array, cv2.COLOR_HSV2BGR_FULL)
+
+    return bgr_cmap
 
 
 # .....................................................................................................................
