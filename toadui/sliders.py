@@ -310,7 +310,7 @@ class MultiSlider(CachedBgFgElement):
         # Set up element styling
         self.style = UIStyle(
             color=color,
-            indicator_width=indicator_width,
+            indicator_width_fg=indicator_width,
             indicator_width_bg=indicator_width * 2,
             indicator_color_fg=fg_color,
             indicator_color_bg=pick_contrasting_gray_color(fg_color),
