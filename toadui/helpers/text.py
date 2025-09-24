@@ -280,7 +280,7 @@ class TextDrawer:
 
 def find_minimum_text_width(text_drawer: TextDrawer, max_num_characters: int, padding_px: int = 6) -> int:
     """Helper used to find a minimum width of an image that needs to hold some number of characters"""
-    txt_for_sizing = " " * (max_num_characters)
+    txt_for_sizing = "M" * (max_num_characters)
     _, txt_w, _ = text_drawer.get_text_size(txt_for_sizing)
     return txt_w + 2 * padding_px
 

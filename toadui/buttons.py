@@ -10,7 +10,7 @@ import numpy as np
 
 from toadui.base import BaseCallback, CachedBgFgElement
 from toadui.helpers.text import TextDrawer
-from toadui.helpers.images import blank_image
+from toadui.helpers.images import blank_image, pad_image_to_hw
 from toadui.helpers.drawing import draw_box_outline, draw_drop_shadow, draw_rectangle_norm
 from toadui.helpers.colors import interpret_coloru8, adjust_as_hsv, pick_contrasting_gray_color, lerp_colors
 from toadui.helpers.styling import UIStyle
@@ -165,8 +165,9 @@ class ToggleImageButton(BaseCallback):
         default_state: bool = False,
         include_box_outline: bool = True,
         resize_interpolation: OCVInterp = cv2.INTER_AREA,
-        height: int = 40,
-        minimum_width: int = 40,
+        height: int | None = None,
+        minimum_width: int | None = None,
+        fill_to_fit_space: bool = True,
         is_flexible_h: bool = False,
         is_flexible_w: bool = True,
     ):
@@ -177,12 +178,19 @@ class ToggleImageButton(BaseCallback):
         if toggle_image is None:
             toggle_image = default_image
 
+        # Fill in missing height/width
+        if height is None:
+            height = default_image.shape[0]
+        if minimum_width is None:
+            minimum_width = default_image.shape[1]
+
         # Storage for cached data
         self._default_ar = default_image.shape[1] / default_image.shape[0]
         self._off_img = toggle_image if default_state else default_image
         self._on_img = default_image if default_state else toggle_image
         self._cached_off_img = blank_image(1, 1)
         self._cached_on_img = blank_image(1, 1)
+        self._fill_to_fit = fill_to_fit_space
 
         # Storage for toggle state
         self._is_on = default_state
@@ -193,6 +201,8 @@ class ToggleImageButton(BaseCallback):
             outline_color=(0, 0, 0) if include_box_outline else None,
             outline_hover_color=(255, 255, 255) if include_box_outline else None,
             resize_interpolation=resize_interpolation,
+            fill_color=(0, 0, 0),
+            fill_style=cv2.BORDER_REPLICATE,
         )
 
         # Inherit from parent
@@ -241,11 +251,15 @@ class ToggleImageButton(BaseCallback):
             off_img = resize_hw(self._off_img, off_hw, self.style.resize_interpolation)
             on_img = resize_hw(self._on_img, on_hw, self.style.resize_interpolation)
 
+            if self._fill_to_fit:
+                off_img = pad_image_to_hw(on_img, h, w, self.style.fill_color, self.style.fill_style)
+                on_img = pad_image_to_hw(on_img, h, w, self.style.fill_color, self.style.fill_style)
+
             # Store images for re-use
             self._cached_off_img = draw_box_outline(off_img, self.style.outline_color)
             self._cached_on_img = draw_box_outline(on_img, self.style.outline_color)
 
-        # Draw button label
+        # Draw button with outline
         btn_img = self._cached_on_img if self._is_on else self._cached_off_img
         if self.is_hovered():
             btn_img = draw_box_outline(btn_img.copy(), self.style.outline_hover_color)
@@ -337,6 +351,93 @@ class ImmediateButton(BaseCallback):
 
         if self.is_hovered():
             return draw_box_outline(self._cached_img.copy(), (255, 255, 255))
+
+        return self._cached_img
+
+    # .................................................................................................................
+
+
+class ImmediateImageButton(BaseCallback):
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        image: ndarray,
+        include_box_outline: bool = True,
+        resize_interpolation: OCVInterp = cv2.INTER_AREA,
+        height: int | None = None,
+        minimum_width: int | None = None,
+        fill_to_fit_space: bool = False,
+        is_flexible_h: bool = False,
+        is_flexible_w: bool = True,
+    ):
+
+        # Force grayscale to BGR, for display compatibility
+        if image.ndim < 3:
+            image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
+
+        # Fill in missing height/width
+        if height is None:
+            height = image.shape[0]
+        if minimum_width is None:
+            minimum_width = image.shape[1]
+
+        # Storage for cached button image
+        self._orig_img = image.copy()
+        self._cached_img = blank_image(1, 1)
+        self._fill_to_fit = fill_to_fit_space
+
+        # Storage for button state
+        self._is_changed = False
+
+        # Set up element styling
+        self.style = UIStyle(
+            outline_color=(0, 0, 0) if include_box_outline else None,
+            outline_hover_color=(255, 255, 255) if include_box_outline else None,
+            resize_interpolation=resize_interpolation,
+            fill_color=(0, 0, 0),
+            fill_style=cv2.BORDER_REPLICATE,
+        )
+
+        # Inherit from parent
+        super().__init__(height, minimum_width, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
+
+    def __repr__(self) -> str:
+        cls_name = self.__class__.__name__
+        return f"{cls_name} ({self._orig_img.shape[0]} x {self._orig_img.shape[1]})"
+
+    # .................................................................................................................
+
+    def read(self) -> bool:
+        is_changed = self._is_changed
+        self._is_changed = False
+        return is_changed
+
+    def click(self) -> SelfType:
+        self._is_changed = True
+        return self
+
+    # .................................................................................................................
+
+    def _on_left_click(self, cbxy, cbflags) -> None:
+        self.click()
+
+    # .................................................................................................................
+
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+
+        # Re-draw on/off button states if size changes
+        if h != self._cached_img.shape[0] or w != self._cached_img.shape[1]:
+            img_hw = get_image_hw_to_fit_region(self._orig_img.shape, (h, w))
+            new_img = resize_hw(self._orig_img, img_hw, self.style.resize_interpolation)
+            if self._fill_to_fit and img_hw[0] < h or img_hw[1] < w:
+                new_img = pad_image_to_hw(new_img, h, w, self.style.fill_color, self.style.fill_style)
+            self._cached_img = draw_box_outline(new_img, self.style.outline_color)
+
+        # Draw button with outline
+        if self.is_hovered():
+            return draw_box_outline(self._cached_img.copy(), self.style.outline_hover_color)
 
         return self._cached_img
 

@@ -155,56 +155,69 @@ class PrefixedTextBlock(TextBlock):
     # .................................................................................................................
 
 
-class SubtitledTextBlock(CachedBgFgElement):
-    """UI element that displays text with 2 lines. Meant to be used as a title block."""
+class TwoLineTextBlock(CachedBgFgElement):
+    """UI element that displays text with 2 lines, one above the other"""
 
     # .................................................................................................................
 
     def __init__(
         self,
-        title: str,
-        subtitle: str,
-        color: COLORU8 | int = (64, 53, 52),
-        text_scale: float = 0.5,
-        height: int = 80,
+        line_1: str,
+        line_2: str,
+        color_l1: COLORU8 | int = (160, 160, 160),
+        color_l2: COLORU8 | int = (255, 255, 255),
+        color_bg: COLORU8 | int = (64, 53, 52),
+        l1_text_scale: float = 0.35,
+        l2_text_scale: float = 0.35,
+        height: int = 50,
+        minimum_width: int | None = None,
         is_flexible_w: bool = True,
     ):
 
         # Storage for text being drawn (expected to be re-used)
-        self._title_str: str = str(title)
-        self._subtitle_str: str = str(subtitle)
+        self._l1_str: str = str(line_1)
+        self._l2_str: str = str(line_2)
 
         # Set up element styling
-        half_height = height // 2
-        text_title = TextDrawer(text_scale * 1.25, font=cv2.FONT_HERSHEY_DUPLEX, max_height=half_height)
-        text_subtitle = TextDrawer(text_scale, max_height=half_height)
+        max_l1_h = round(height * l1_text_scale / (l1_text_scale + l2_text_scale))
+        max_l2_h = height - max_l1_h
+        text_l1 = TextDrawer(l1_text_scale, max_height=max_l1_h, color=color_l1)
+        text_l2 = TextDrawer(l2_text_scale, max_height=max_l2_h, color=color_l2)
         self.style = UIStyle(
-            color=interpret_coloru8(color),
+            color=interpret_coloru8(color_bg),
             outline_color=(0, 0, 0),
-            text_title=text_title,
-            text_subtitle=text_subtitle,
+            text_l1=text_l1,
+            text_l2=text_l2,
+            text_align_xy_l1=(0, 0.5),
+            text_align_xy_l2=(0, 0.5),
+            text_anchor_xy_l1=None,
+            text_anchor_xy_l2=None,
+            text_offset_xy_px_l1=(5, 0),
+            text_offset_xy_px_l2=(5, 0),
         )
 
         # Set up element sizing
-        ref_txt = f"  {title}  " if len(title) > len(subtitle) else f"  {subtitle}  "
-        _, txt_w, _ = text_title.get_text_size(ref_txt)
-        super().__init__(height, txt_w, is_flexible_h=False, is_flexible_w=is_flexible_w)
+        if minimum_width is None:
+            _, txt1_w, _ = text_l1.get_text_size(f"--{line_1}--")
+            _, txt2_w, _ = text_l2.get_text_size(f"--{line_2}--")
+            minimum_width = max(txt1_w, txt2_w)
+        super().__init__(height, minimum_width, is_flexible_h=False, is_flexible_w=is_flexible_w)
 
     # .................................................................................................................
 
     def __repr__(self) -> str:
         class_name = self.__class__.__name__
-        return f"{class_name}({self._title_str}: {self._subtitle_str})"
+        return f"{class_name}({self._l1_str}: {self._l2_str})"
 
     # .................................................................................................................
 
-    def set_text(self, title: str | None = None, subtitle: str | None = None) -> SelfType:
-        """Update text and/or subtitle. Inputs left as 'None' will not be altered"""
-        if title is not None:
-            self._title_str = str(title)
+    def set_text(self, line_2: str | None = None, line_1: str | None = None) -> SelfType:
+        """Update text. Inputs left as 'None' will not be altered"""
+        if line_2 is not None:
+            self._l2_str = str(line_2)
             self.request_fg_repaint()
-        if subtitle is not None:
-            self._subtitle_str = str(subtitle)
+        if line_1 is not None:
+            self._l1_str = str(line_1)
             self.request_fg_repaint()
         return self
 
@@ -215,11 +228,25 @@ class SubtitledTextBlock(CachedBgFgElement):
 
     def _rerender_fg(self, bg_image: ndarray) -> ndarray:
 
-        # Re-draw title & subtitle text over background
-        title_h, _, _ = self.style.text_title.get_text_size(self._title_str)
-        self.style.text_title.xy_norm(bg_image, self._title_str, (0.5, 0.5), offset_xy_px=(0, -title_h))
-        sub_h, _, _ = self.style.text_title.get_text_size(self._subtitle_str)
-        self.style.text_subtitle.xy_norm(bg_image, self._subtitle_str, (0.5, 0.5), offset_xy_px=(0, sub_h))
+        # For convenience
+        l1_xy_off = self.style.text_offset_xy_px_l1
+        l2_xy_off = self.style.text_offset_xy_px_l2
+        l1_anc = self.style.text_anchor_xy_l1
+        l2_anc = self.style.text_anchor_xy_l2
+
+        # Figure out offset y-positioning (to get 2-line effect)
+        l1_x, l1_y = self.style.text_align_xy_l1
+        l2_x, l2_y = self.style.text_align_xy_l2
+        l1_scale = self.style.text_l1.style.scale
+        l2_scale = self.style.text_l2.style.scale
+        l1_weight = l1_scale / (l1_scale + l2_scale)
+        l2_weight = 1.0 - l1_weight
+        l1_yf = l1_y * l1_weight
+        l2_yf = (l2_y * l2_weight) + l1_weight
+
+        # Re-draw line 1 & line 2 text, offset from center
+        self.style.text_l1.xy_norm(bg_image, self._l1_str, (l1_x, l1_yf), l1_anc, l1_xy_off)
+        self.style.text_l2.xy_norm(bg_image, self._l2_str, (l2_x, l2_yf), l2_anc, l2_xy_off)
 
         return draw_box_outline(bg_image, color=self.style.outline_color)
 
