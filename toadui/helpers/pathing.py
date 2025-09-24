@@ -19,6 +19,54 @@ from typing import Iterable
 # %% Functions
 
 
+def save_path_counter(
+    base_save_path: str | Path,
+    count_separator: str = "-",
+    exclude_0th_index: bool = True,
+    max_count_attempts: int = 100,
+    num_zero_padding: int = 3,
+):
+    """
+    Helper used to construct indexed save paths that avoid
+    overwriting existing files. For example, assume we're
+    given an input of:
+        base_save_path = '/path/to/example/file-edited.jpg'
+    Also assume that the folder containng this file already
+    contains multiple edited copies:
+        '/path/to/example/file-edited.jpg'
+        '/path/to/example/file-edited-1.jpg'
+        '/path/to/example/file-edited-2.jpg'
+        '/path/to/example/file-edited-3.jpg'
+
+    This function will take the input name (file-edited) and
+    add an index to the end (along with the provided separator),
+    then check if the file exists already. If so, the counter will
+    be increment and try again until no prior file is found,
+    at which point the path will be returned.
+    """
+
+    # For convenience
+    save_path = Path(base_save_path)
+    orig_name = save_path.stem
+    num_zero_padding = max(0, num_zero_padding)
+
+    # Keep trying new save names until we find one that doesn't already exist
+    found_unique_path = False
+    for count in range(max_count_attempts):
+        count_str = f"{count:0{num_zero_padding}d}"
+        new_name = orig_name if exclude_0th_index and count == 0 else f"{orig_name}{count_separator}{count_str}"
+        save_path = save_path.with_stem(new_name)
+        found_unique_path = not save_path.exists()
+        if found_unique_path:
+            break
+
+    # Error if we hit max counts
+    if not found_unique_path:
+        raise NameError(f"Cannot create a unique save index after {max_count_attempts} attempts")
+
+    return save_path
+
+
 def modify_file_path(
     original_file_path: str | Path,
     filename_suffix: str | None = "_modified",

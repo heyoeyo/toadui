@@ -104,6 +104,42 @@ def blank_image_1ch(height: int, width: int, gray_value: int = 0) -> ndarray:
     return np.full((height, width), gray_value, dtype=np.uint8)
 
 
+def pad_image_to_hw(
+    image: ndarray,
+    height: int | None,
+    width: int | None,
+    border_color: COLORU8 = (0, 0, 0),
+    border_type: int = cv2.BORDER_CONSTANT,
+) -> ndarray:
+    """
+    Helper used to (center) pad an image to a target height & width.
+    Either of the target height or width values can be given as None,
+    in which case the size will be taken from the image itself,
+    this can be useful for only padding along 1 axis.
+    If the image exceeds the padding width or height, nothing will
+    be done to it (i.e. the image won't be cropped to the target size).
+
+    Returns:
+        padded_image
+    """
+
+    # Fill in missing values
+    img_h, img_w = image.shape[0:2]
+    if height is None:
+        height = img_h
+    if width is None:
+        width = img_w
+
+    # Only apply padding if needed
+    if height > img_h or width > img_w:
+        pad_h, pad_w = max(height - img_h, 0), max(width - img_w, 0)
+        pad_t, pad_l = pad_h // 2, pad_w // 2
+        pad_b, pad_r = pad_h - pad_t, pad_w - pad_l
+        return cv2.copyMakeBorder(image, pad_t, pad_b, pad_l, pad_r, border_type, border_color)
+
+    return image
+
+
 def adjust_image_gamma(image_uint8: ndarray, gamma: float | Iterable[float] = 1.0) -> ndarray:
     """
     Helper used to apply gamma correction to an entire image.

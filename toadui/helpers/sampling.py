@@ -127,6 +127,31 @@ def resample_with_complex_mesh(
     return cv2.remap(image_uint8, xmap, ymap, interpolation, borderMode=border)
 
 
+def rotate_mesh_xy(mesh_xy: ndarray, rotation_angle_rad: float, pivot_xy: tuple[float, float] | None = None) -> ndarray:
+    """
+    Function used to rotate xy coordinates of a mesh.
+    Returns:
+        rotated_mesh_xy
+
+    - The rotation angle is given in radians
+    - A pivot_xy value can be given to rotate around a target point
+    """
+
+    # Avoid doing any work if we're not rotating
+    if rotation_angle_rad == 0:
+        return mesh_xy
+
+    # Build the rotation matrix
+    rot_cos, rot_sin = np.cos(rotation_angle_rad), np.sin(rotation_angle_rad)
+    rotmat = np.array([[rot_cos, rot_sin], [-rot_sin, rot_cos]])
+
+    # Rotate directly or with set pivot point
+    if pivot_xy is None:
+        return np.matmul(mesh_xy, rotmat)
+    pivot_array = np.array(pivot_xy, dtype=mesh_xy.dtype)
+    return np.matmul(mesh_xy - pivot_array, rotmat) + pivot_array
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # %% SDFs
 
@@ -180,7 +205,7 @@ def sdf_circle(mesh_xy: ndarray, xy_center: tuple[float, float], radius: float) 
 
 def sdf_rectangle(mesh_xy: ndarray, xy_center: tuple[float, float], wh: tuple[float, float]) -> ndarray:
     """
-    Helper used to calculate the signed-distance-function (DSF) for a rectangle.
+    Helper used to calculate the signed-distance-function (SDF) for a rectangle.
     This can be used to draw 'perfect' rectangular of arbitrary units,
     (most notably, they do not need to be perfectly pixel-aligned), and
     can be used to draw boxes with rounded corners, for example.
@@ -196,6 +221,59 @@ def sdf_rectangle(mesh_xy: ndarray, xy_center: tuple[float, float], wh: tuple[fl
 
     xy_delta = np.abs(mesh_xy - np.float32(xy_center)) - np.float32(wh) * 0.5
     return np.linalg.norm(np.maximum(xy_delta, 0), ord=2, axis=2) + np.minimum(xy_delta.max(axis=2), 0)
+
+
+def sdf_isoceles_triangle(
+    mesh_xy: ndarray,
+    xy_position: tuple[float, float],
+    base: float,
+    height: float,
+    rotation_angle_rad: float = 0,
+    position_by_base: bool = True,
+) -> ndarray:
+    """
+    Helper used to calculate the signed-distance-function (SDF) for an
+    isoceles triangle. Defined by a base & height sizing.
+
+    The xy_position will either correspond to the position of the 'tip' of
+    the triangle or (if position_by_base=True) the middle of the 'base' of
+    the triangle. The triangle can also be rotated about this point.
+
+    Based on code from shadertoy:
+    https://www.shadertoy.com/view/MldcD7
+    """
+
+    # For sanity
+    base, height = [abs(val) for val in (base, height)]
+
+    # Offset & rotate xy coords to position arrow as desired
+    xy_offset = np.array(xy_position, dtype=mesh_xy.dtype)
+    if position_by_base:
+        xy_offset[0] += np.cos(rotation_angle_rad) * height
+        xy_offset[1] += np.sin(rotation_angle_rad) * height
+    mxy = mesh_xy - np.array(xy_offset, dtype=mesh_xy.dtype)
+    angle_with_offset = (np.pi * 0.5) + rotation_angle_rad
+    mxy = rotate_mesh_xy(mxy, -angle_with_offset)
+    mxy[:, :, 0] = np.abs(mxy[:, :, 0])
+
+    # Mimicking original shadertoy code verbatim (at least, within python), hard to follow!
+    dot_numer = mxy[:, :, 0] * base + mxy[:, :, 1] * height
+    dot_denom = base**2 + height**2
+    dot_result = np.clip(dot_numer / dot_denom, 0.0, 1.0)
+
+    ax = mxy[:, :, 0] - (base * dot_result)
+    ay = mxy[:, :, 1] - (height * dot_result)
+    a = np.dstack((ax, ay))
+    bx = mxy[:, :, 0] - base * np.clip(mxy[:, :, 0] / base, 0.0, 1.0)
+    by = mxy[:, :, 1] - height
+    b = np.dstack((bx, by))
+
+    channel_dotprod_2d = "xyc,xyc->xy"
+    d = np.minimum(np.einsum(channel_dotprod_2d, a, a), np.einsum(channel_dotprod_2d, b, b))
+    s = np.maximum((mxy[:, :, 0] * height - mxy[:, :, 1] * base), (mxy[:, :, 1] - height))
+
+    sdf = np.sqrt(d) * np.sign(s)
+    return sdf
 
 
 def sdf_line_segment(mesh_xy: ndarray, point_a_xy: tuple[float, float], point_b_xy: tuple[float, float]) -> ndarray:
@@ -214,6 +292,60 @@ def sdf_line_segment(mesh_xy: ndarray, point_a_xy: tuple[float, float], point_b_
     delta_ba = np.float32(point_b_xy) - np.float32(point_a_xy)
     dist_from_a = np.clip(np.dot(delta_a, delta_ba) / np.dot(delta_ba, delta_ba), 0.0, 1.0)
     return np.linalg.norm(delta_a - (delta_ba * np.expand_dims(dist_from_a, 2)), ord=2, axis=2)
+
+
+def sdf_circle_segment(
+    mesh_xy: ndarray,
+    xy_center: tuple[float, float],
+    radius: float,
+    thickness: float,
+    extent_norm: float = 0.75,
+    start_angle_rad: float = 0,
+) -> ndarray:
+    """
+    Helper used to calculate the signed-distance-function (SDF) for a circular
+    segment. If the 'extent' is less than 1, then the circle will be incomplete.
+    This can be useful for drawing rotation-like icons.
+
+    Based on code from shadertoy:
+    https://www.shadertoy.com/view/wl23RK
+
+    Returns:
+        sdf_of_circular_segment
+    """
+
+    # Center and rotate mesh, to get desired starting point
+    mxy = mesh_xy - np.array(xy_center, dtype=mesh_xy.dtype)
+    angle_offset = np.pi * (1 - 2 * extent_norm) * 0.5
+    rotation_angle = angle_offset - start_angle_rad
+    mxy = rotate_mesh_xy(mxy, rotation_angle)
+    mxy[:, :, 0] = np.abs(mxy[:, :, 0])
+
+    # Calculate extent terms (these determine the 'cut-out' of the circle)
+    extent_rad = np.pi * extent_norm
+    sin_ext = np.sin(extent_rad)
+    cos_ext = np.cos(extent_rad)
+    sin_cos_ext = np.array((sin_ext, cos_ext), dtype=mesh_xy.dtype)
+
+    # Compute cut-out mask
+    cutout_mask = mxy[:, :, 0] * cos_ext > mxy[:, :, 1] * sin_ext
+    circle_mask = np.bitwise_not(cutout_mask)
+
+    # Compute sdf for circular & cut-out regions
+    cutout_sdf = np.linalg.norm(mxy - sin_cos_ext * radius, ord=2, axis=2)
+    circle_sdf = np.abs(np.linalg.norm(mxy, ord=2, axis=2) - radius)
+
+    # Combine regions with mask to finalize sdf
+    sdf = np.empty(mesh_xy.shape[0:2], dtype=mesh_xy.dtype)
+    sdf[cutout_mask] = cutout_sdf[cutout_mask]
+    sdf[circle_mask] = circle_sdf[circle_mask]
+    sdf = sdf - (thickness * 0.5)
+
+    return sdf
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# %% Interpolation
 
 
 def smoothstep(edge0: float, edge1: float, x: ndarray | float) -> ndarray | float:

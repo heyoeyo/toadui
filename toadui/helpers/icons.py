@@ -14,6 +14,8 @@ from toadui.helpers.sampling import (
     make_xy_coordinate_mesh,
     sdf_line_segment,
     sdf_rectangle,
+    sdf_isoceles_triangle,
+    sdf_circle_segment,
     smoothstep,
     pointwise_minimum_of_many,
 )
@@ -160,3 +162,49 @@ def draw_play_pause_icons(
     cv2.rectangle(bar_img, pt3, pt4, bars_symbol_color, -1)
 
     return triangle_img, bar_img
+
+
+def draw_rotating_arrow_icons(
+    color_fg: COLORU8 = (255, 255, 255),
+    color_bg: COLORU8 = (0, 0, 0),
+    side_length_px: int = 40,
+    scale_norm: float = 0.95,
+    thickness_norm: float = 0.25,
+    arrow_scale_norm: float = 1,
+    antialias_px=4,
+) -> tuple[ndarray, ndarray]:
+    """
+    Helper used to draw rotating arrow icons, which
+    are conventionally used to represent 'rotation',
+    'going back' or 'reloading'.
+
+    Returns:
+        left_facing_rot_arrow, right_facing_rot_arrow
+    """
+    # Build xy coordinate mesh for sdfs
+    icon_scale = 1.0 / scale_norm
+    xy1, xy2 = (-icon_scale, icon_scale), (icon_scale, -icon_scale)
+    mesh_xy = make_xy_coordinate_mesh((side_length_px, side_length_px), xy1, xy2)
+
+    # Figure out sizing
+    arrow_base = 0.225 * arrow_scale_norm
+    arrow_height = 0.45 * arrow_scale_norm
+    radius = scale_norm - (thickness_norm + arrow_base) * 0.5
+
+    # Figure out positioning of circle & arrow head
+    circ_xy = (0, 0)
+    sdf_circ = sdf_circle_segment(mesh_xy, circ_xy, radius, thickness_norm, start_angle_rad=np.pi)
+    arrow_xy = (circ_xy[0], circ_xy[1] + radius)
+    sdf_arrow = sdf_isoceles_triangle(mesh_xy, arrow_xy, arrow_base, arrow_height, np.pi) - 0.1
+
+    # Apply antialiasing for nicer result
+    sdf_left_rotarrow = pointwise_minimum_of_many(sdf_circ, sdf_arrow)
+    antialias_norm = 0.5 * antialias_px / side_length_px
+    l_img_f32 = smoothstep(antialias_norm, -antialias_norm, sdf_left_rotarrow)
+    l_img_f32 = np.expand_dims(l_img_f32, -1)
+
+    # Color image as weighted sum of foreground/background colors & create right-pointing version
+    l_img_u8 = np.uint8(np.round(color_fg * l_img_f32 + (1 - l_img_f32) * color_bg))
+    r_img_u8 = np.fliplr(l_img_u8)
+
+    return l_img_u8, r_img_u8

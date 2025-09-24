@@ -47,6 +47,18 @@ The UI includes support for interactive click-and-drag boxes. The built-in [sele
 
 **UI Elements:** FixedARImage, ZoomImage, Swapper, ToggleImageButton, EditBoxOverlay, DrawRectangleOverlay, VideoPlaybackSlider, PrefixedTextBlock
 
+## image_viewer.py
+
+This demo runs a very simple image viewer:
+
+<p align="center">
+  <img src="https://github.com/user-attachments/assets/f0719f0d-b0fd-48f2-b669-89b8889558ef"  style="width:400px">
+</p>
+
+The UI includes a file selector (to allow for switching between images in a folder) and prints out basic information about each image in a sidebar. It also includes support for rotating the image as well as downscaling it, with the ability to save a copy of the modified result.
+
+**UI Elements:** FixedARImage, TwoLineTextBlock, ImmediateImageButton, PathCarousel
+
 
 ## ocv_edge_detection.py
 
@@ -102,7 +114,7 @@ The UI provides a one-to-one mapping of the OpenCV function arguments (obscure t
 This demo runs a live 2D [FFT](https://en.wikipedia.org/wiki/Fast_Fourier_transform) visualization on images, videos or webcams.
 
 <p align="center">
-  <img src="https://github.com/user-attachments/assets/232a25fc-6027-48f8-90c7-55fe0c5ade1b">
+  <img src="https://github.com/user-attachments/assets/232a25fc-6027-48f8-90c7-55fe0c5ade1b" style="width:400px">
 </p>
 
 The visualization includes a toggle to switch between showing the [magnitude or phase](https://www.comm.utoronto.ca/dkundur/course_info/signals/notes/Kundur_FourierMagPhase.pdf) result. It also allows for basic painting over top of the magnitude and/or phase plots, while displaying the effect (after performing an inverse FFT) on the input image.
