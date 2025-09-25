@@ -6,10 +6,144 @@
 # %% Imports
 
 import os.path as osp
+from pathlib import Path
 from time import sleep
+import json
+import __main__
 
 # For type hints
-from typing import Iterable, Callable
+from typing import Iterable, Callable, Any
+from toadui.helpers.types import SelfType
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# %% Classes
+
+
+class HistoryJSON:
+    """
+    Class used to manage loading/saving to a 'history' JSON file.
+
+    The point of this being to store & re-use important settings,
+    typically for re-using file loading paths.
+    Typical usage:
+
+        # Load existing history, if any
+        history = HistoryJSON()
+        _, history_loadpath = history.read("load_path")
+        _, history_setting = history.read("important_setting")
+
+        # Use history values as default
+        load_path = ask_to_load_file(default=history_loadpath)
+        setting = ask_for_important_setting(default=history_setting)
+
+        # Store new results
+        history.store(load_path=load_path, important_setting=setting)
+
+    """
+
+    # .................................................................................................................
+
+    def __init__(self, save_folder: str | Path | None = None, save_name: str = ".history"):
+
+        # Set up history save file pathing
+        if save_folder is None:
+            save_folder = __file__
+        save_folder = Path(save_folder)
+        save_folder = save_folder.expanduser()
+        save_folder = save_folder.parent if save_folder.is_file() else save_folder
+        if not save_folder.exists():
+            save_folder = ""
+        save_path = Path(save_folder).joinpath(save_name)
+
+        self._filepath = save_path
+        self._history_dict = {}
+        self.reload()
+
+    # .................................................................................................................
+
+    def read(self, key: str, value_if_missing: Any = None) -> tuple[bool, Any]:
+        """
+        Read from history data
+        Returns:
+            is_valid_key, loaded_value
+        """
+        is_valid_key = key in self._history_dict.keys()
+        loaded_value = self._history_dict.get(key, value_if_missing)
+        return is_valid_key, loaded_value
+
+    def store(self, **key_value_kwargs: Any) -> SelfType:
+        """
+        Update and save history data. Use as follows:
+            history.store(some_setting=5, another_setting="hello", load_path="/path/to/data")
+
+        This will save data to a JSON file, with the structure:
+            {
+                "some_setting": 5,
+                "another_setting": "hello",
+                "load_path: "/path/to/data",
+            }
+        Which can be read from using the .read(...) function.
+        """
+
+        # Force path types to strings (otherwise not serializable)
+        key_value_kwargs = {k: v if not isinstance(v, Path) else str(v) for k, v in key_value_kwargs.items()}
+
+        # Check if new data is valid
+        new_history_dict = {**self._history_dict, **key_value_kwargs}
+        try:
+            json.dumps(new_history_dict)
+            is_valid_json = True
+        except TypeError:
+            is_valid_json = False
+            print(
+                "",
+                f"*** {self.__class__.__name__} Error ***",
+                "Cannot store history, invalid as json:",
+                new_history_dict,
+                sep="\n",
+                flush=True,
+            )
+
+        # Only re-write history data if the json is valid
+        if is_valid_json:
+            with open(self._filepath, "w") as outfile:
+                json.dump(new_history_dict, outfile, indent=2)
+            self._history_dict = new_history_dict
+
+        return self
+
+    # .................................................................................................................
+
+    def reload(self) -> SelfType:
+        """
+        Reload an existing history file (if any). This should not need to be
+        called under normal circumstances. It is helpful for initial loading
+        mainly (or if something is changing the histrory file externally).
+        """
+
+        try:
+            with open(self._filepath, "r") as infile:
+                history_dict = json.load(infile)
+
+        except json.JSONDecodeError:
+            history_dict = {}
+            print(
+                "",
+                f"*** {self.__class__.__name__} Error ***",
+                "History file is corrupted! Unable to load...",
+                f"@ {self._filepath}",
+                sep="\n",
+                flush=True,
+            )
+
+        except FileNotFoundError:
+            history_dict = {}
+        self._history_dict = history_dict
+
+        return self
+
+    # .................................................................................................................
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -19,11 +153,11 @@ from typing import Iterable, Callable
 def ask_for_path_if_missing(
     path: str | None = None,
     default_path: str | None = None,
-    path_type: str = "file",
     allow_files: bool = True,
     allow_folders: bool = False,
+    prompt: str = "Enter path to file: ",
     special_case_check: Callable[str, bool] | None = None,
-    quit_on_keyboard_interupt=True,
+    quit_on_keyboard_interrupt: bool = True,
 ) -> str:
     """
     Helper used to provide a basic command-line prompt asking for a file/folder path
@@ -54,25 +188,30 @@ def ask_for_path_if_missing(
     if osp.exists(path):
         return path
 
-    # Wipe out bad default paths
-    if default_path is not None:
-        if not osp.exists(default_path):
-            default_path = None
-
     # Use dummy special case check if not provided
     if special_case_check is None:
         special_case_check = lambda s: False
     else:
         assert callable(special_case_check), "special_case_check must be a function!"
-    
+
     # Bail if given a valid custom path
     if special_case_check(path):
         return path
 
+    # Wipe out bad default paths
+    if default_path is not None:
+        if not (osp.exists(default_path) or special_case_check(default_path)):
+            default_path = None
+
+    # Pad prompt text to align with default text if needed (only if using a short custom prompt)
+    num_trailing_space = len(prompt) - len(prompt.rstrip(" "))
+    prompt_for_default = "(default:" + "".join([" "] * num_trailing_space)
+    if len(prompt) < len(prompt_for_default) and default_path is not None:
+        prompt = prompt.rjust(len(prompt_for_default), " ")
+
     # Set up prompt text and default if needed
-    prompt_txt = f"Enter path to {path_type}: "
-    default_msg_spacing = " " * (len(prompt_txt) - len("(default:") - 1)
-    default_msg = "" if default_path is None else f"{default_msg_spacing}(default: {default_path})"
+    default_msg_spacing = " " * (len(prompt) - len(prompt_for_default) - 0)
+    default_msg = "" if default_path is None else f"{default_msg_spacing}{prompt_for_default}{default_path})"
 
     # Keep asking for a path until it points to something
     try:
@@ -84,7 +223,7 @@ def ask_for_path_if_missing(
                 print(default_msg, flush=True)
 
             # Ask user for path, and fallback to default if nothing is given
-            path = _clean_path_str(input(prompt_txt))
+            path = _clean_path_str(input(prompt))
             if path == "" and default_path is not None:
                 path = default_path
 
@@ -98,11 +237,11 @@ def ask_for_path_if_missing(
                     break
                 if osp.isdir(path) and allow_folders:
                     break
-            print("", "", f"Invalid {path_type} path!", sep="\n", flush=True)
+            print("", "", "Invalid path!", sep="\n", flush=True)
             sleep(0.75)
 
     except KeyboardInterrupt:
-        if quit_on_keyboard_interupt:
+        if quit_on_keyboard_interrupt:
             print()
             quit()
         raise KeyboardInterrupt()
@@ -113,12 +252,85 @@ def ask_for_path_if_missing(
 # .....................................................................................................................
 
 
+def ask_for_media_path(
+    path: str | None = None,
+    allow_image=True,
+    allow_video=True,
+    allow_webcam=True,
+    allow_folder=False,
+    prompt: str | None = None,
+    quit_on_keyboard_interrupt: bool = True,
+    default_path: str | None = None,
+    history_folder: str | Path | None = None,
+    history_name: str | None = ".path_history",
+) -> str:
+    """
+    Helper function used ask for paths to visual media, or folders.
+    This is similar to the ask_for_path_if_missing(...) function,
+    except three notable differences:
+        - can accept webcam inputs (anything with 'cam' in the name)
+          even though these are not file/folder paths
+        - will auto-generate the prompt text (e.g. 'Enter path to ___')
+          based on which inputs are allowed
+        - includes a built-in history saving function. This
+          automatically fills in default path using prior results
+          (based on prompt). Can be disabled by setting history_name=None
+
+    Note that this function does not validate images/videos/webcam
+    inputs, other than to confirm the file path exists.
+    (or contains 'cam' if webcams are allowed)
+    """
+
+    # Sanity check
+    allow_files = any((allow_image, allow_video, allow_webcam))
+    assert allow_files or allow_folder, "Must allow folders or at least one file type!"
+
+    # Auto-generate prompt message if needed
+    if prompt is None:
+        prompt_lut = {"video": allow_video, "image": allow_image, "folder": allow_folder, "cam": allow_webcam}
+        allowed_types = [key for key, val in prompt_lut.items() if val]
+        prompt_types = allowed_types[0]
+        if len(allowed_types) > 1:
+            comma_str = ", ".join(allowed_types[0:-1])
+            or_str = f" or {allowed_types[-1]}"
+            prompt_types = "".join((comma_str, or_str))
+        prompt = f"Enter path to {prompt_types}: "
+
+    # Generate a default path from history
+    enable_history = history_name is not None
+    if enable_history:
+        hist = HistoryJSON(history_folder, history_name)
+        if default_path is None:
+            _, default_path = hist.read(prompt)
+
+    # Ask user for path
+    check_for_webcam_func = lambda s: ("cam" in str(s).lower()) and (not osp.exists(s))
+    selected_path = ask_for_path_if_missing(
+        path,
+        default_path,
+        allow_files=allow_files,
+        allow_folders=allow_folder,
+        prompt=prompt,
+        special_case_check=check_for_webcam_func if allow_webcam else None,
+        quit_on_keyboard_interrupt=quit_on_keyboard_interrupt,
+    )
+
+    # Store result for re-use if it isn't already what we're using
+    if enable_history and (default_path != selected_path):
+        hist.store(**{prompt: selected_path})
+
+    return selected_path
+
+
+# .....................................................................................................................
+
+
 def select_from_options(
     menu_options: Iterable[str],
     default_option: str | None = None,
     menu_message: str = "Select option:",
     special_case_check: Callable[str, bool] | None = None,
-    quit_on_keyboard_interupt: bool = True,
+    quit_on_keyboard_interrupt: bool = True,
 ) -> str:
     """
     Function which provides a simple ui for selecting an item from a 'menu'.
@@ -207,7 +419,7 @@ def select_from_options(
             sleep(0.75)
 
     except KeyboardInterrupt:
-        if quit_on_keyboard_interupt:
+        if quit_on_keyboard_interrupt:
             print()
             quit()
 

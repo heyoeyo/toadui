@@ -10,7 +10,8 @@ import argparse
 import cv2
 import numpy as np
 
-from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string, ask_for_video_path
+from toadui.cli import ask_for_media_path
+from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string
 from toadui.window import DisplayWindow, KEY
 from toadui.buttons import ToggleButton, RadioBar
 from toadui.sliders import MultiSlider
@@ -179,7 +180,7 @@ assert (
 # %% Setup input source
 
 # Handle webcam inputs
-input_path = ask_for_video_path(input_path, path_type="video or image", allow_webcam_inputs=True)
+input_path = ask_for_media_path(input_path)
 is_webcam_source, input_path = read_webcam_string(input_path)
 is_image_source, vreader = load_looping_video_or_image(input_path, display_size)
 

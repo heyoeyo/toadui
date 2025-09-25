@@ -9,5 +9,8 @@ wheels/
 # Virtual environments
 .venv
 
+# Ignore path history files
+*.path_history
+
 # Catch-all for local ignorables
 ignore/

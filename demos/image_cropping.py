@@ -9,8 +9,9 @@ import argparse
 
 import cv2
 
+from toadui.cli import ask_for_media_path
 from toadui.window import DisplayWindow, KEY
-from toadui.video import VideoPlaybackSlider, ask_for_video_path, load_looping_video_or_image, read_webcam_string
+from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string
 from toadui.images import DynamicImage, FixedARImage, ZoomImage
 from toadui.text import PrefixedTextBlock
 from toadui.layout import VStack, HStack, Swapper
@@ -46,7 +47,7 @@ display_size = args.display_size
 # %% Setup UI elements
 
 # Handle video vs. image vs. webcam inputs
-input_path = ask_for_video_path(input_path, path_type="image or video", allow_webcam_inputs=True)
+input_path = ask_for_media_path(input_path)
 is_webcam_source, input_path = read_webcam_string(input_path)
 is_image_source, vreader = load_looping_video_or_image(input_path)
 sample_frame = vreader.get_sample_frame()

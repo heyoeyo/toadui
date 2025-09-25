@@ -7,8 +7,9 @@
 
 import argparse
 
+from toadui.cli import ask_for_media_path
 from toadui.window import DisplayWindow, KEY
-from toadui.video import LoopingVideoReader, VideoPlaybackSlider, read_webcam_string, ask_for_video_path
+from toadui.video import LoopingVideoReader, VideoPlaybackSlider, read_webcam_string
 from toadui.images import DynamicImage
 from toadui.text import PrefixedTextBlock
 from toadui.layout import VStack, HStack
@@ -38,7 +39,7 @@ display_size = args.display_size
 # %% Setup UI
 
 # Handle webcam inputs
-input_path = ask_for_video_path(input_path, allow_webcam_inputs=True)
+input_path = ask_for_media_path(input_path, allow_image=False)
 is_webcam_source, input_path = read_webcam_string(input_path)
 vreader = LoopingVideoReader(input_path)
 

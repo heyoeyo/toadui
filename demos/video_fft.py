@@ -10,8 +10,9 @@ import argparse
 import cv2
 import numpy as np
 
+from toadui.cli import ask_for_media_path
 from toadui.window import DisplayWindow, KEY
-from toadui.video import VideoPlaybackSlider, read_webcam_string, ask_for_video_path, load_looping_video_or_image
+from toadui.video import VideoPlaybackSlider, read_webcam_string, load_looping_video_or_image
 from toadui.images import FixedARImage
 from toadui.layout import VStack, HStack, Swapper
 from toadui.buttons import ToggleButton, ImmediateButton, RadioBar
@@ -109,10 +110,10 @@ def invert_fft(magnitude_f32: ndarray, phase_f32: ndarray, use_centering: bool, 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Setup UI
 
-# Handle webcam inputs
-input_path = ask_for_video_path(input_path, allow_webcam_inputs=True)
+# Set up input reader
+input_path = ask_for_media_path(input_path, allow_image=True, allow_video=True, allow_webcam=True)
 is_webcam_source, input_path = read_webcam_string(input_path)
-is_image_source, vreader = load_looping_video_or_image(input_path, display_size_px=600)
+is_image_source, vreader = load_looping_video_or_image(input_path)
 
 # Define UI elements
 img_elem = FixedARImage(vreader.get_sample_frame())

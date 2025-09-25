@@ -11,8 +11,9 @@ from time import perf_counter
 import cv2
 import numpy as np
 
+from toadui.cli import ask_for_media_path
 from toadui.window import DisplayWindow, KEY
-from toadui.video import LoopingVideoReader, VideoPlaybackSlider, read_webcam_string, ask_for_video_path
+from toadui.video import LoopingVideoReader, VideoPlaybackSlider, read_webcam_string
 from toadui.images import DynamicImage, FixedARImage
 from toadui.sliders import Slider, MultiSlider
 from toadui.buttons import ToggleButton
@@ -108,7 +109,7 @@ def optflow_to_dxdy_false_color(
 # %% Setup UI
 
 # Handle webcam inputs
-input_path = ask_for_video_path(input_path, allow_webcam_inputs=True)
+input_path = ask_for_media_path(input_path, allow_image=False)
 is_webcam_source, input_path = read_webcam_string(input_path)
 vreader = LoopingVideoReader(input_path)
 input_max_side_length = max(vreader.get_sample_frame().shape)

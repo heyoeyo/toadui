@@ -12,8 +12,8 @@ from pathlib import Path
 import cv2
 import numpy as np
 
+from toadui.cli import ask_for_media_path
 from toadui.window import DisplayWindow, KEY
-from toadui.cli import ask_for_path_if_missing
 from toadui.images import FixedARImage
 from toadui.text import TwoLineTextBlock
 from toadui.sliders import Slider
@@ -86,10 +86,8 @@ def get_file_info_strings(file_stats, dt_format="%Y/%m/%d %H:%M:%S %p") -> tuple
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Setup UI
 
-# Get pathing to image or folder of images
-input_path = ask_for_path_if_missing(input_path, path_type="image or folder", allow_folders=True)
-
-# Switch to parent folder pathing, if needed
+# Get pathing to image or folder of images & switch to parent folder, if needed
+input_path = ask_for_media_path(input_path, allow_video=False, allow_webcam=False, allow_folder=True)
 input_path = Path(input_path)
 initial_file_select = None
 if search_parent_folder and input_path.is_file():

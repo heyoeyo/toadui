@@ -882,22 +882,3 @@ def read_webcam_string(input_source: str | int | None):
             output_source = int(int_str if len(int_str) > 0 else 0)
 
     return is_webcam, output_source
-
-
-def ask_for_video_path(
-    video_path: str | None = None,
-    default_path: str | None = None,
-    path_type="video",
-    allow_webcam_inputs: bool = False,
-    quit_on_keyboard_interupt: bool = True,
-) -> str:
-    check_for_cam = lambda s: "cam" in str(s).lower()
-    return ask_for_path_if_missing(
-        video_path,
-        default_path,
-        path_type=path_type,
-        allow_files=True,
-        allow_folders=False,
-        special_case_check=check_for_cam if allow_webcam_inputs else None,
-        quit_on_keyboard_interupt=quit_on_keyboard_interupt,
-    )

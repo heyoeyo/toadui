@@ -11,8 +11,9 @@ from time import perf_counter
 import cv2
 import numpy as np
 
+from toadui.cli import ask_for_media_path
 from toadui.window import DisplayWindow, KEY
-from toadui.video import VideoPlaybackSlider, read_webcam_string, ask_for_video_path, load_looping_video_or_image
+from toadui.video import VideoPlaybackSlider, read_webcam_string, load_looping_video_or_image
 from toadui.images import FixedARImage
 from toadui.layout import VStack, HStack, Swapper
 from toadui.buttons import RadioBar, ToggleButton
@@ -81,7 +82,7 @@ morpho_ops_lut = {"Gradient": cv2.MORPH_GRADIENT, "Blackhat": cv2.MORPH_BLACKHAT
 # %% Setup UI
 
 # Handle webcam inputs
-input_path = ask_for_video_path(input_path, path_type="video or image", allow_webcam_inputs=True)
+input_path = ask_for_media_path(input_path)
 is_webcam_source, input_path = read_webcam_string(input_path)
 is_image_source, vreader = load_looping_video_or_image(input_path)
 is_video_source = is_webcam_source or (not is_image_source)
