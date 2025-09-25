@@ -368,7 +368,7 @@ class ImmediateImageButton(BaseCallback):
         resize_interpolation: OCVInterp = cv2.INTER_AREA,
         height: int | None = None,
         minimum_width: int | None = None,
-        fill_to_fit_space: bool = False,
+        fill_to_fit_space: bool = True,
         is_flexible_h: bool = False,
         is_flexible_w: bool = True,
     ):
@@ -384,6 +384,7 @@ class ImmediateImageButton(BaseCallback):
             minimum_width = image.shape[1]
 
         # Storage for cached button image
+        self._orig_ar = image.shape[1] / image.shape[0]
         self._orig_img = image.copy()
         self._cached_img = blank_image(1, 1)
         self._fill_to_fit = fill_to_fit_space
@@ -425,13 +426,18 @@ class ImmediateImageButton(BaseCallback):
 
     # .................................................................................................................
 
+    def _get_dynamic_aspect_ratio(self):
+        if self._cb_rdr.is_flexible_h and self._cb_rdr.is_flexible_w:
+            return self._orig_ar
+        return None
+
     def _render_up_to_size(self, h: int, w: int) -> ndarray:
 
         # Re-draw on/off button states if size changes
         if h != self._cached_img.shape[0] or w != self._cached_img.shape[1]:
             img_hw = get_image_hw_to_fit_region(self._orig_img.shape, (h, w))
             new_img = resize_hw(self._orig_img, img_hw, self.style.resize_interpolation)
-            if self._fill_to_fit and img_hw[0] < h or img_hw[1] < w:
+            if self._fill_to_fit and (img_hw[0] < h or img_hw[1] < w):
                 new_img = pad_image_to_hw(new_img, h, w, self.style.fill_color, self.style.fill_style)
             self._cached_img = draw_box_outline(new_img, self.style.outline_color)
 

@@ -182,6 +182,9 @@ class BaseCallback(CBChild):
     def get_event_xy(self) -> CBEventXY:
         return self._cb_state.event_xy
 
+    def get_min_hw(self) -> HWPairPX:
+        return HWPairPX(self._cb_rdr.min_h, self._cb_rdr.min_w)
+
     def render(self, h: int | None = None, w: int | None = None) -> ndarray:
         rend_h, rend_w = self._get_render_hw(h, w)
         frame = self._render_up_to_size(rend_h, rend_w)

@@ -128,7 +128,7 @@ ui_layout = VStack(
             modified_txt_block,
             wh_txt_block,
             size_txt_block,
-            VSeparator(color=(30, 25, 20), is_flexible_h=True),
+            VSeparator(8, color=(30, 25, 20), is_flexible_h=True),
             edit_wh_txt_block,
             HStack(rot_left_btn, rot_right_btn),
             save_btn if enable_save else None,
@@ -144,7 +144,7 @@ ui_layout = VStack(
 
 # Set up display window and attach UI for mouse interactions
 window = DisplayWindow(display_fps=60)
-window.enable_size_control(display_size)
+window.enable_size_control(display_size, minimum=ui_layout.get_min_hw().h)
 window.attach_mouse_callbacks(ui_layout)
 window.attach_keypress_callbacks(
     {
