@@ -252,7 +252,7 @@ class ToggleImageButton(BaseCallback):
             on_img = resize_hw(self._on_img, on_hw, self.style.resize_interpolation)
 
             if self._fill_to_fit:
-                off_img = pad_image_to_hw(on_img, h, w, self.style.fill_color, self.style.fill_style)
+                off_img = pad_image_to_hw(off_img, h, w, self.style.fill_color, self.style.fill_style)
                 on_img = pad_image_to_hw(on_img, h, w, self.style.fill_color, self.style.fill_style)
 
             # Store images for re-use
