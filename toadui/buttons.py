@@ -554,19 +554,27 @@ class RadioConstraint:
     arranged in a UI while still using this element.
     """
 
-    def __init__(self, *items: ToggleButton, active_index=0):
+    # .................................................................................................................
 
+    def __init__(self, *items: ToggleButton, initial_active_index=0):
         self._items = tuple(items)
-        self._active_idx = active_index
+        num_items = len(self._items)
+        assert num_items > 0, "Cannot form radio constraint, zero items provided!"
 
-        self._bit_state = np.zeros(len(self._items), dtype=np.bool)
-        self._bit_state[active_index] = True
-        self._enforce_radio_constraint(active_index)
+        self._is_changed_forced = True
+        self._active_idx = initial_active_index
+        self._state_array = np.zeros(num_items, dtype=np.bool)
+        self._force_one_active()
 
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
         item_names = ", ".join((str(item) for item in self._items))
         return f"{cls_name} [{item_names}]"
+
+    def __iter__(self):
+        return iter(self._items)
+
+    # .................................................................................................................
 
     def read(self) -> tuple[bool, int, ToggleButton]:
         """
@@ -576,47 +584,95 @@ class RadioConstraint:
         """
 
         # Read all item states
-        new_bit_state = np.zeros_like(self._bit_state)
+        self._state_array.fill(False)
+        new_state = self._state_array
         for item_idx, item in enumerate(self._items):
             _, item_state = item.read()
-            new_bit_state[item_idx] = item_state
+            new_state[item_idx] = item_state
 
-        # Look for changes in states
-        bit_change_state = np.bitwise_xor(new_bit_state, self._bit_state)
-        num_bits_changed = np.sum(bit_change_state)
-        is_changed = num_bits_changed == 1
+        # If we have no active items, force previous item on (e.g. happens if user toggles existing item)
+        is_any_changed = False
+        num_active = np.sum(new_state)
+        if num_active == 1:
+            # If new active index is not the previous one, then update internal record keeping
+            is_any_changed = not new_state[self._active_idx]
+            if is_any_changed:
+                self._active_idx = np.argmax(new_state)
+            pass
 
-        # If nothing changes, repeat prior outputs
-        if num_bits_changed == 0:
-            return is_changed, self._active_idx, self._items[self._active_idx]
+        elif num_active == 2:
+            # If one of 2 active is previous active, assume we need to change to other item as new active item
+            new_active_includes_previous = new_state[self._active_idx]
+            if new_active_includes_previous:
+                new_state[self._active_idx] = False
+                self._active_idx = np.argmax(new_state)
+                is_any_changed = True
 
-        # If more than 1 button changes in a single update, restore previous state
-        # (which item should be active is ambiguous in this case)
-        if num_bits_changed > 1:
-            bit_change_state = self._bit_state
+            # Either way, force 1 active item only
+            # -> If previous wasn't active, we can't tell which item should be active, so re-use previous
+            self._force_one_active()
 
-        # Force items into state satisfying radio constraint
-        self._bit_state = bit_change_state
-        self._active_idx = np.argmax(bit_change_state)
-        self._enforce_radio_constraint()
+        else:
+            # 0 or more than 2 active, we can't tell what to do, so re-set previous active item
+            self._force_one_active()
 
-        return is_changed, self._active_idx, self._items[self._active_idx]
+        # Force is change flag, if needed
+        is_any_changed |= self._is_changed_forced
+        self._is_changed_forced = False
+        return is_any_changed, self._active_idx, self._items[self._active_idx]
 
-    def _enforce_radio_constraint(self, active_index: int | None = None) -> SelfType:
-        """Loop over all group items and force all but 1 to be off"""
+    # .................................................................................................................
 
-        if active_index is None:
-            active_index = self._active_idx
+    def next(self, increment: int = 1) -> SelfType:
+        new_idx = (self._active_idx + increment) % len(self._items)
+        self._items[new_idx].toggle(True)
+        return self
 
-        for item_idx, item in enumerate(self._items):
-            is_on = item_idx == active_index
-            item.toggle(is_on)
-            item.set_is_changed(False)
+    def prev(self, decrement: int = 1) -> SelfType:
+        return self.next(-decrement)
+
+    # .................................................................................................................
+
+    def set_index(self, item_index: int) -> SelfType:
+
+        num_items = len(self._items)
+        new_idx = max(0, min(num_items, item_index))
+        is_changed = new_idx != self._active_idx
+        if is_changed:
+            self._active_idx = new_idx
+            self._force_one_active()
+            self._is_changed_forced = True
 
         return self
 
-    def __iter__(self):
-        return iter(self._items)
+    def set_item(self, item_ref: ToggleButton, error_if_invalid=True) -> SelfType:
+
+        if item_ref in self._items:
+            new_idx = self._items.index(item_ref)
+            self.set_index(new_idx)
+        else:
+            if error_if_invalid:
+                raise NameError(f"Item is not in radio group ({item_ref})")
+
+        return
+
+    def set_is_changed(self, is_changed: bool = True) -> SelfType:
+        """Artificially force change state"""
+        self._is_changed_forced = True
+        return self
+
+    # .................................................................................................................
+
+    def _force_one_active(self, suppress_is_changed=False) -> SelfType:
+
+        for idx, item in enumerate(self._items):
+            item.toggle(idx == self._active_idx)
+            if suppress_is_changed:
+                item.set_is_changed(False)
+
+        return self
+
+    # .................................................................................................................
 
 
 class RadioBar(CachedBgFgElement):
@@ -632,8 +688,8 @@ class RadioBar(CachedBgFgElement):
         self,
         *labels: str | float | int | None,
         active_index: int = 0,
-        color_on: COLORU8 = (95, 90, 75),
-        color_off: COLORU8 | None = None,
+        color_on: COLORU8 | int = (95, 90, 75),
+        color_off: COLORU8 | int | None = None,
         text_scale: float = 0.5,
         proportional_sizing: bool = False,
         label_padding: int = 2,
@@ -647,8 +703,11 @@ class RadioBar(CachedBgFgElement):
         self._is_changed = True
         self._enable_wrap_around = True
 
+        # Handle variety of possible color inputs
+        color_on = interpret_coloru8(color_on)
         if color_off is None:
             color_off = adjust_as_hsv(color_on, 1, 0.35, 0.65)
+        color_off = interpret_coloru8(color_off)
 
         # Set up element styling
         text_color_on = pick_contrasting_gray_color(color_on)
