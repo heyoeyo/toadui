@@ -14,8 +14,7 @@ from toadui.window import DisplayWindow, KEY
 from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string
 from toadui.images import DynamicImage, FixedARImage, ZoomImage
 from toadui.text import PrefixedTextBlock
-from toadui.layout import VStack, HStack, Swapper
-from toadui.static import VSeparator, HSeparator
+from toadui.layout import VStack, HStack, Swapper, VSeparator, HSeparator
 from toadui.buttons import ImmediateButton, ToggleImageButton
 from toadui.sliders import Slider
 from toadui.overlays import EditBoxOverlay, DrawRectangleOverlay

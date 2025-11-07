@@ -18,7 +18,7 @@ from toadui.images import DynamicImage
 from toadui.carousels import TextCarousel
 from toadui.layout import VStack, HStack
 from toadui.colormaps import apply_colormap, make_wa_rainbow_colormap
-from toadui.static import StaticMessageBar
+from toadui.text import MessageBar
 from toadui.helpers.sampling import make_xy_complex_mesh, resample_with_complex_mesh
 from toadui.patterns.misc import draw_grid
 import toadui.patterns.truchet as truchet
@@ -146,7 +146,7 @@ rbow_toggle = ToggleButton("Rainbow")
 xspeed_slider = Slider("X Speed", 0, -1, 1, 0.01, marker_step=0.5).set(0.25, use_as_default_value=False)
 yspeed_slider = Slider("Y Speed", 0, -1, 1, 0.01, marker_step=0.5)
 tval_slider = Slider("Effect", 1, -2, 2, 0.01, marker_step=0.25)
-msg_bar = StaticMessageBar("Right click sliders to reset", text_scale=0.35, height=30)
+msg_bar = MessageBar("Right click sliders to reset", text_scale=0.35, height=30)
 
 # Stack elements together to form layout for display
 show_playback_bar = not (is_webcam_source or is_image_source)

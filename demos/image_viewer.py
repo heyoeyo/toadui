@@ -18,8 +18,7 @@ from toadui.images import FixedARImage
 from toadui.text import TwoLineTextBlock
 from toadui.sliders import Slider
 from toadui.buttons import ImmediateButton, ToggleButton, ImmediateImageButton
-from toadui.layout import VStack, HStack
-from toadui.static import VSeparator
+from toadui.layout import VStack, HStack, VSeparator
 from toadui.carousels import PathCarousel
 from toadui.helpers.icons import draw_rotating_arrow_icons
 from toadui.helpers.pathing import save_path_counter, modify_file_path, simplify_path

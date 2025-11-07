@@ -5,9 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
-import cv2
-
-from toadui.base import CachedBgFgElement
+from toadui.base import BaseCallback, CachedBgFgElement
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.text import TextDrawer, find_minimum_text_width
 from toadui.helpers.images import blank_image
@@ -249,5 +247,79 @@ class TwoLineTextBlock(CachedBgFgElement):
         self.style.text_l2.xy_norm(bg_image, self._l2_str, (l2_x, l2_yf), l2_anc, l2_xy_off)
 
         return draw_box_outline(bg_image, color=self.style.outline_color)
+
+    # .................................................................................................................
+
+
+class MessageBar(BaseCallback):
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        *messages: str,
+        text_scale: float = 0.5,
+        color: COLORU8 | int = (150, 110, 15),
+        height: int = 40,
+        space_equally: bool = False,
+        is_flexible_w: bool = True,
+    ):
+
+        # Store messages with front/back padding for nicer spacing on display (and skip 'None' entries)
+        self._msgs_list = [f" {msg}  " for msg in messages if msg is not None]
+
+        # Store visual settings
+        color = interpret_coloru8(color)
+        self._base_image = blank_image(1, 1, color)
+        self._cached_img = self._base_image.copy()
+        text_color = pick_contrasting_gray_color(color)
+
+        # Make sure our text sizing fits in the given bar height
+        text_draw = TextDrawer(scale=text_scale, color=text_color)
+        txt_h, _, _ = text_draw.get_text_size("".join(self._msgs_list))
+        if txt_h > height:
+            new_scale = text_scale * (height / txt_h) * 0.8
+            text_draw.style.scale = new_scale
+
+        # Record message widths, used to assign space when minimum drawing size
+        msg_widths = [text_draw.get_text_size(m)[1] for m in self._msgs_list]
+        total_msg_w = sum(msg_widths)
+
+        # Pre-compute the relative x-positioning of each message for display
+        cumulative_w = [sum(msg_widths[:k]) for k in range(len(self._msgs_list))]
+        self._msg_x_norms = [(cum_w + 0.5 * msg_w) / total_msg_w for cum_w, msg_w in zip(cumulative_w, msg_widths)]
+        if space_equally:
+            num_msgs = len(msg_widths)
+            self._msg_x_norms = [(k + 0.5) / num_msgs for k in range(num_msgs)]
+            total_msg_w = max(msg_widths) * num_msgs
+        self._space_equal = space_equally
+
+        # Set up element styling
+        self.style = UIStyle(
+            color=color,
+            outline_color=(0, 0, 0),
+            text=text_draw,
+        )
+
+        # Inherit from parent & render initial image to cache results
+        super().__init__(height, total_msg_w, is_flexible_h=False, is_flexible_w=is_flexible_w)
+        self.render(height, total_msg_w)
+
+    # .................................................................................................................
+
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+
+        # Re-draw image when sizing has changed
+        img_h, img_w = self._cached_img.shape[0:2]
+        if img_h != h or img_w != w:
+            msg_img = blank_image(h, w, self.style.color)
+            for msg_str, x_norm in zip(self._msgs_list, self._msg_x_norms):
+                msg_img = self.style.text.xy_norm(msg_img, msg_str, (x_norm, 0.5), anchor_xy_norm=(0.5, 0.5))
+            msg_img = draw_box_outline(msg_img, self.style.outline_color)
+
+            # Cache image for re-use
+            self._cached_img = msg_img
+
+        return self._cached_img
 
     # .................................................................................................................

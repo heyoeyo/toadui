@@ -18,8 +18,7 @@ from toadui.images import DynamicImage, FixedARImage
 from toadui.sliders import Slider, MultiSlider
 from toadui.buttons import ToggleButton
 from toadui.text import PrefixedTextBlock
-from toadui.layout import VStack, HStack
-from toadui.static import HSeparator
+from toadui.layout import VStack, HStack, HSeparator
 from toadui.colormaps import apply_colormap, make_colormap_from_keypoints
 from toadui.overlays import HoverLabelOverlay
 from toadui.helpers.colors import convert_color

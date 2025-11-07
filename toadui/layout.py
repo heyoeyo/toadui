@@ -9,13 +9,16 @@ import cv2
 import numpy as np
 
 from toadui.base import BaseCallback
+from toadui.helpers.text import TextDrawer
+from toadui.helpers.images import blank_image
 from toadui.helpers.styling import UIStyle
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 
 # For type hints
 from typing import Iterable, Any
 from numpy import ndarray
 from toadui.base import BaseOverlay, CBRenderSizing
-from toadui.helpers.types import SelfType, HWPX
+from toadui.helpers.types import SelfType, HWPX, COLORU8
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -910,6 +913,86 @@ class Swapper(BaseCallback):
             if not child._cb_state.disabled:
                 yield from child._cb_iter(global_x_px, global_y_px)
         return
+
+    # .................................................................................................................
+
+
+class HSeparator(BaseCallback):
+    """Simple element used to create a horizontal space between other elements"""
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        width: int = 2,
+        color: COLORU8 | int = (20, 20, 20),
+        label: str | None = None,
+        is_flexible_h: bool = True,
+        is_flexible_w: bool = False,
+    ):
+        self._cached_img = blank_image(1, width, color)
+        self._label = label
+        self.style = UIStyle(
+            color=interpret_coloru8(color),
+            text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
+        )
+        super().__init__(1, width, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
+
+    # .................................................................................................................
+
+    @classmethod
+    def many(cls, num_separators: int, width: int = 2, color: COLORU8 | int = (20, 20, 20)):
+        return [cls(width, color) for _ in range(num_separators)]
+
+    # .................................................................................................................
+
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+        img_h, img_w = self._cached_img.shape[0:2]
+        if img_h != h or img_w != w:
+            self._cached_img = blank_image(h, w, self.style.color)
+            if self._label is not None:
+                self._cached_img = self.style.text.xy_centered(self._cached_img, self._label)
+        return self._cached_img
+
+    # .................................................................................................................
+
+
+class VSeparator(BaseCallback):
+    """Simple element used to create a vertical space between other elements"""
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        height: int = 2,
+        color: COLORU8 | int = (20, 20, 20),
+        label: str | None = None,
+        is_flexible_h: bool = False,
+        is_flexible_w: bool = True,
+    ):
+        self._cached_img = blank_image(height, 1, color)
+        self._label = label
+        self.style = UIStyle(
+            color=interpret_coloru8(color),
+            text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
+        )
+        super().__init__(height, 1, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
+
+    # .................................................................................................................
+
+    @classmethod
+    def many(cls, num_separators: int, height: int = 2, color: COLORU8 | int = (20, 20, 20)):
+        return [cls(height, color) for _ in range(num_separators)]
+
+    # .................................................................................................................
+
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+        img_h, img_w = self._cached_img.shape[0:2]
+        if img_h != h or img_w != w:
+            self._cached_img = blank_image(h, w, self.style.color)
+            if self._label is not None:
+                self._cached_img = self.style.text.xy_centered(self._cached_img, self._label)
+        return self._cached_img
 
     # .................................................................................................................
 
