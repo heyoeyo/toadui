@@ -7,6 +7,7 @@
 
 from pathlib import Path
 
+import cv2
 import numpy as np
 
 from toadui.base import CachedBgFgElement
@@ -364,9 +365,15 @@ class PathCarousel(TextCarousel):
 
     If a folder path is given, then the contents of the folder will be
     listed out as the carousel entries.
+
     If a list of strings or paths is given, then these are assumed
     to be file/folder paths and each file/folder name will become an
     entry in the carousel.
+
+    If a file is given and 'search_parent_folder' is True, then
+    the contents of the parent folder will be listed in the carousel.
+    Using 'search_parent_folder=False' while providing a single file
+    path will lead to having only a single entry in the carousel!
     """
 
     # .................................................................................................................
@@ -381,6 +388,7 @@ class PathCarousel(TextCarousel):
         center_deadspace: float = 0.05,
         sort_by_name: bool = True,
         sort_key: Callable | None = None,
+        search_parent_folder: bool = True,
     ):
 
         # Force into pathlib type for convenience
@@ -388,9 +396,14 @@ class PathCarousel(TextCarousel):
             folder_path_or_path_list = Path(folder_path_or_path_list)
 
         # Handle single path input (e.g. is a directory or file) vs. list of paths
+        init_key = None
         paths_list = None
         if isinstance(folder_path_or_path_list, Path):
+            init_key = folder_path_or_path_list.name
             is_dir = folder_path_or_path_list.is_dir()
+            if not is_dir and search_parent_folder:
+                folder_path_or_path_list = folder_path_or_path_list.parent
+                is_dir = True
             paths_list = [p for p in folder_path_or_path_list.iterdir()] if is_dir else [folder_path_or_path_list]
         elif isinstance(folder_path_or_path_list, Iterable):
             paths_list = [Path(p) for p in folder_path_or_path_list]
@@ -408,6 +421,10 @@ class PathCarousel(TextCarousel):
         kv_pairs = {p.name: p for p in paths_list}
         super().__init__(kv_pairs, color, height, minimum_width, text_scale, center_deadspace)
 
+        # In case we were given a file (and read from it's parent folder), make sure we initialize on the file itself
+        if init_key is not None:
+            self.set_key(init_key, use_as_default_value=True)
+
         # Storage for previously loaded data (if loading from path), used to avoid repeat loading
         self._loaded_data = None
 
@@ -415,4 +432,124 @@ class PathCarousel(TextCarousel):
         """Returns: is_changed, current_file_name, current_file_path"""
         return super().read()
 
+    def load_next_valid(self, path_validity_function: Callable[[Path], bool | tuple[bool, Any]]) -> tuple[Path, Any]:
+        """
+        Read/load the next valid entry. Validity is determined by the provided function.
+        Invalid entries are automatically removed from the carousel.
+
+        The path_validity_function must take in a path and return either a boolean
+        indicating if the path is valid, or alternatively, a tuple of a
+        validity boolean and some associated data (e.g. data loaded from the path).
+
+        Example returning only an is_valid boolean:
+            def load_txt(path):
+                is_valid = str(path).endswith("txt")
+                return is_valid
+
+        Example returning is_valid & data:
+            def load_heavy_data(path):
+                data = expensive_load_func(path)
+                is_valid = len(data) == 123
+                return is_valid, data
+
+        Returns:
+            valid_path, loaded_data
+            - if the validity function only returns a boolean, then 'loaded_data' will be None
+        """
+
+        is_valid, read_data = False, None
+        while True:
+            assert len(self) > 0, f"{self} - Read error! No valid entries"
+            _, _, next_path = self.read()
+            validity_result = path_validity_function(next_path)
+
+            # Handle read results (assume we either get an is_valid boolean or a [bool, data] tuple)
+            if isinstance(validity_result, bool):
+                is_valid, read_data = validity_result, None
+
+            elif isinstance(validity_result, Iterable):
+                assert len(validity_result) == 2, f"{self} - Validity function must return two-tuple: (is_valid, data)"
+                is_valid, read_data = validity_result
+
+            else:
+                raise ValueError("Unable to interpret read_function result:", validity_result)
+
+            # Remove invalid entries and try again if needed
+            if not is_valid:
+                self.remove_current_entry()
+                continue
+            break
+
+        return next_path, read_data
+
     # .................................................................................................................
+
+    @staticmethod
+    def is_folder_path(path: str | Path):
+        """Helper used to check if a given path points to a folder/directory"""
+        return Path(path).is_dir()
+
+    @staticmethod
+    def is_file_path(path: str | Path):
+        """Helper used to check if a given path points to a file"""
+        return Path(path).is_file()
+
+    @staticmethod
+    def check_path_exists(path: str | Path):
+        """Helper used to check if a given path exists"""
+        return Path(path).exists()
+
+    @staticmethod
+    def walk(path: str | Path, top_down=True, on_error=None, follow_symlinks=False):
+        """
+        Helper used to 'walk' the file system from the given starting folder
+        (if given a file path, will search from the parent folder)
+        This is a generator! Returns:
+            parent_folder_path, child_folder_paths, child_file_paths
+
+        Meant to be used in a loop:
+            for parent_folder, sub_folders, sub_files in PathCarousel.walk():
+                # do something with paths
+        """
+        start_folder = Path(path)
+        start_folder = start_folder.parent if start_folder.is_file() else start_folder
+        yield from Path(start_folder).walk(top_down, on_error, follow_symlinks)
+
+
+# ---------------------------------------------------------------------------------------------------------------------
+# %% Functions
+
+
+def load_valid_image(image_path: str | Path) -> tuple[bool, ndarray | None]:
+    """
+    Helper used to provide a True/False flag indicating if a loaded image is valid.
+    Meant to be used with PathCarousel 'load_next_valid' functionality.
+    Returns:
+        is_valid, image_data
+    """
+    img_data = cv2.imread(image_path)
+    is_valid = img_data is not None
+    return is_valid, img_data
+
+
+def make_load_valid_ext_func(ext: str | list[str], case_insensitive=True) -> Callable[[Path], bool]:
+    """
+    Helper used to construct a 'validity function' that checks whether a path ends
+    with a target extension. This is meant to be used with the PathCarousel 'load_next_valid'
+    functionality. Note that a list of valid extensions can also be provided!
+
+    Returns:
+        ext_validity_function
+        - This function itself returns an is_valid bool when given a Path as input
+    """
+
+    ext_list = ext if isinstance(ext, Iterable) else [ext]
+    if case_insensitive:
+        ext_list = [str(val).lower() for val in ext_list]
+    ext_set = set(ext_list)
+
+    def load_valid_ext(path: Path):
+        check_path = str(Path).lower() if case_insensitive else str(Path)
+        return any(check_path.endswith(val) for val in ext_set)
+
+    return load_valid_ext
