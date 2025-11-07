@@ -331,7 +331,7 @@ class MousePaintOverlay(BaseOverlay):
     This is handled through the 'read_trail()' function:
 
         # Read trail data
-        is_trail_finished, trail_xy_norm lmr_index = overlay.read()
+        is_trail_finished, trail_xy_norm, lmr_index = overlay.read_trail()
 
         # Handle storage/plotting of trail data
         if is_trail_finished:
@@ -339,6 +339,9 @@ class MousePaintOverlay(BaseOverlay):
         else:
             draw_trail_in_progress(trail_xy_norm)
         ...etc...
+
+    Consider using an 'UndoRedoList' (from toadui data management) to
+    store trail data, which provides support for undo/redo & clearing!
     """
 
     # .................................................................................................................
@@ -351,6 +354,7 @@ class MousePaintOverlay(BaseOverlay):
         allow_left_click: bool = True,
         allow_middle_click: bool = False,
         allow_right_click: bool = False,
+        brush_radius_norm=0.1,
     ):
 
         # Allocate storage for mouse press/change state for left/middle/right click
@@ -362,7 +366,7 @@ class MousePaintOverlay(BaseOverlay):
         self._curr_cbxy = CBEventXY.default()
         self._trail = []
         self._trail_lmr = 0
-        self._brush_rad_norm = 0.1
+        self._brush_rad_norm = brush_radius_norm
         self._is_trail_in_progress = False
 
         # Set rendering state

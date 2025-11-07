@@ -53,7 +53,10 @@ class DisplayWindow:
         self._frame_delay_ms = int(1000 // display_fps)
         self._last_display_sec = -self._frame_delay_ms
         self.dt = 1.0 / display_fps
+
+        # Variables used for storing window size + changes
         self.size = None
+        self._is_size_changed = False
 
         # Allocate variables for use of keypress callbacks
         self._keypress_callbacks_dict: dict[int, Callable] = {}
@@ -363,12 +366,17 @@ class DisplayWindow:
 
         initial_size, minimum, maximum, step = [int(val) for val in (initial_size, minimum, maximum, step)]
         self.size = initial_size
+        self._is_size_changed = True
 
         def increase_size():
-            self.size = min(self.size + step, maximum)
+            new_size = min(self.size + step, maximum)
+            self._is_size_changed = self.size != new_size
+            self.size = new_size
 
         def decrease_size():
-            self.size = max(self.size - step, minimum)
+            new_size = max(self.size - step, minimum)
+            self._is_size_changed = self.size != new_size
+            self.size = new_size
 
         self.attach_keypress_callbacks(
             {
@@ -380,6 +388,12 @@ class DisplayWindow:
         )
 
         return self
+
+    def is_size_changed(self) -> bool:
+        """Check if window size has changed (only makes sense if size control has been enabled!)"""
+        is_changed = self._is_size_changed
+        self._is_size_changed = False
+        return is_changed
 
 
 # ---------------------------------------------------------------------------------------------------------------------

@@ -9,7 +9,6 @@ import os.path as osp
 from pathlib import Path
 from time import sleep
 import json
-import __main__
 
 # For type hints
 from typing import Iterable, Callable, Any

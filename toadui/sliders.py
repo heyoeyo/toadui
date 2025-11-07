@@ -356,7 +356,7 @@ class MultiSlider(CachedBgFgElement):
             self._initial_values = new_values.copy()
 
         # Check if new values are actually different and store
-        self._is_changed |= np.allclose(new_values, self._slider_values)
+        self._is_changed |= not np.allclose(new_values, self._slider_values)
         self._slider_values = new_values
         self.request_fg_repaint()
 
