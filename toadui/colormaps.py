@@ -42,7 +42,7 @@ class ColormapsBar(BaseCallback):
         """
 
         # Store basic state
-        self._is_changed = False
+        self._is_changed = True
         self._cmap_idx = 0
 
         # Store sizing settings

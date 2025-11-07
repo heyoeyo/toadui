@@ -55,7 +55,7 @@ def convert_color(color: COLORU8, conversion_code: int) -> tuple[int, int, int]:
     Helper used to convert singular color values, without requiring a full image
     For example:
         bgr_color = (12, 23, 34)
-        hsv_color = convert_color(bgr_color, cv2.BGR2HSV_FULL)
+        hsv_color = convert_color(bgr_color, cv2.COLOR_BGR2HSV_FULL)
         -> hsv_color = (21, 165, 34)
     """
 
@@ -187,3 +187,29 @@ def pick_contrasting_gray_color(
         new_color = lerp_colors(new_color, color_bgr, color_lerp_weight)
 
     return new_color
+
+
+# .....................................................................................................................
+
+
+def generate_unique_colors(
+    num_colors: int,
+    saturation: int = 170,
+    value: int = 180,
+    hue_offset_0to1: float | None = 0,
+) -> list[COLORU8]:
+    """
+    Helper used to generate a list of colors with equally spaced hue values
+    (in HSV color space). By default, colors start at 'red', but
+    an offset can be given to change this, if the offset is None, then
+    it will be chosen randomly!
+    """
+
+    # Randomize offset if none given
+    if hue_offset_0to1 is None:
+        hue_offset_0to1 = float(np.random.rand())
+
+    offset_255 = 255 * hue_offset_0to1
+    num_colors = max(1, num_colors)
+    hsv_colors = [(round(offset_255 + (k * 255 / num_colors)) % 255, saturation, value) for k in range(num_colors)]
+    return [convert_color(color, cv2.COLOR_HSV2BGR_FULL) for color in hsv_colors]

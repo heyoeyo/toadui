@@ -44,6 +44,7 @@ class SimpleHistogramPlot(CachedBgFgElement):
         color_line: COLORU8 | int = (75, 185, 225),
         aspect_ratio: float = 1.5,
         min_side_length: int = 128,
+        include_y_axis: bool = True,
         use_bar_plot: bool = False,
         use_log_scale: bool = False,
         use_strict_ar: bool = False,
@@ -72,6 +73,7 @@ class SimpleHistogramPlot(CachedBgFgElement):
         # Store plot config
         self._title_margin_px = 30
         self._label_margin_px = 20
+        self._include_y_axis = include_y_axis
         self._use_bar_plot = use_bar_plot
         self._use_log_scale = use_log_scale
         self._use_strict_ar = use_strict_ar
@@ -267,7 +269,8 @@ class SimpleHistogramPlot(CachedBgFgElement):
         axis_xy1 = (plot_x1 - 1, plot_y1)
         axis_xy2 = (plot_x1 - 1, plot_y2 + 1)
         axis_xy3 = (plot_x2, plot_y2 + 1)
-        cv2.line(img, axis_xy1, axis_xy2, self.style.color_axis, self.style.thickness_axis, cv2.LINE_4)
+        if self._include_y_axis:
+            cv2.line(img, axis_xy1, axis_xy2, self.style.color_axis, self.style.thickness_axis, cv2.LINE_4)
         cv2.line(img, axis_xy2, axis_xy3, self.style.color_axis, self.style.thickness_axis, cv2.LINE_4)
 
         # Store plot area coords for drawing data line/bars
