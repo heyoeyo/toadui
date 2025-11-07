@@ -129,19 +129,21 @@ class TextDrawer:
         xy_norm: XYNORM,
         anchor_xy_norm: XYNORM | None = None,
         offset_xy_px: XYPX = (0, 0),
+        margin_xy_px: XYPX | int = (5, 5),
         color: COLORU8 | None = None,
     ) -> ndarray:
         """
         Helper used to draw text given normalized (0-to-1) xy coordinates
         An anchor point can be provided to change where the text is drawn, relative
-        to the given xy_norm position.
+        to the given xy_norm position. This can be used to get 'left/center/right justified' text.
         If an anchor point isn't given, then it will match the xy_norm value itself,
         which will lead to text always being drawn within the image, as long as 0-to-1 coordinates are given.
 
         For example, an anchor of (0.5, 0.5) means that the text will be centered on the given xy_norm position.
-        - To draw text in the top-left corner, use xy_norm = (0,0) and anchor = (0,0)
-        - To draw text in the bottom-right corner, use xy_norm = (1,1) and anchor = (1,1)
-        - To draw text at the bottom-center, use xy_norm = (0.5, 1) and anchor = (0.5, 1)
+        - To draw text that is centered, but 'left-justified', use xy_norm=(0.5, 0.5), anchor=(0, 0)
+        - To draw text in the top-left corner, use xy_norm=(0, 0)
+        - To draw text in the bottom-right corner, use xy_norm=(1, 1)
+        - To draw text at the bottom-center, use xy_norm=(0.5, 1)
         """
 
         # Figure out pixel coords for the given normalized position
@@ -149,14 +151,19 @@ class TextDrawer:
         img_h, img_w = image.shape[0:2]
         x_norm, y_norm = xy_norm
 
+        # Handle integer margin inputs
+        if isinstance(margin_xy_px, int):
+            margin_xy_px = (margin_xy_px, margin_xy_px)
+        x_margin, y_margin = margin_xy_px
+
         # If no anchor is given, match to positioning, which has a 'bounding' effect of text position
         if anchor_xy_norm is None:
             anchor_xy_norm = xy_norm
 
         # Figure out text positioning on image, in pixel coords
         anchor_x_norm, anchor_y_norm = anchor_xy_norm
-        txt_x_px = x_norm * (img_w - 1) - txt_w * anchor_x_norm
-        txt_y_px = y_norm * (img_h - 1) + txt_h * (1 - anchor_y_norm)
+        txt_x_px = x_norm * (img_w - 1 - 2 * x_margin) - txt_w * anchor_x_norm + x_margin
+        txt_y_px = y_norm * (img_h - 1 - 2 * y_margin) + txt_h * (1 - anchor_y_norm) + y_margin
 
         # Apply offset before final drawing
         offset_x_px, offset_y_px = offset_xy_px
@@ -173,8 +180,8 @@ class TextDrawer:
         offset_xy_px: XYPX = (0, 0),
     ) -> ndarray:
         """Helper used to draw x/y centered text"""
-        xy_norm, anchor_xy_norm = (0.5, 0.5), (0.5, 0.5)
-        return self.xy_norm(image, text, xy_norm, anchor_xy_norm, offset_xy_px, color)
+        xy_norm, anchor_xy_norm, margin_xy = (0.5, 0.5), (0.5, 0.5), (0, 0)
+        return self.xy_norm(image, text, xy_norm, anchor_xy_norm, offset_xy_px, margin_xy, color)
 
     # .................................................................................................................
 
@@ -182,10 +189,10 @@ class TextDrawer:
         self,
         image: ndarray,
         text: str,
-        xy1_norm=(0.0, 0.0),
-        xy2_norm=(1.0, 1.0),
-        margin_xy_px=(0, 0),
-        scale_step_size=0.05,
+        xy1_norm: XYNORM = (0.0, 0.0),
+        xy2_norm: XYNORM = (1.0, 1.0),
+        margin_xy_px: XYPX | int = (5, 5),
+        scale_step_size: float = 0.05,
     ) -> ndarray:
         """
         Function used to draw text in order to 'fill' a given box region in the image.
@@ -195,6 +202,10 @@ class TextDrawer:
         margin specified and with a scaling limited to multiples of the
         given scale step size (rendering can be cleaner with certain multiples).
         """
+
+        # Handle integer margin inputs
+        if isinstance(margin_xy_px, int):
+            margin_xy_px = (margin_xy_px, margin_xy_px)
 
         # Figure out how large of a drawing area we have
         img_h, img_w = image.shape[0:2]
@@ -211,7 +222,13 @@ class TextDrawer:
         # Draw text to new scale (with step size limiting)
         xy_mid = tuple((a + b) / 2 for a, b in zip(xy1_norm, xy2_norm))
         new_scale = np.floor((base_scale * scale_adjust) / scale_step_size) * scale_step_size
-        return self.xy_norm(image, text, xy_mid, anchor_xy_norm=(0.5, 0.5), scale=new_scale)
+
+        # Cache previous scale, draw text, then restore scale (so we don't mess with original config)
+        old_scale = self.style.scale
+        self.style.scale = new_scale
+        out_img = self.xy_norm(image, text, xy_mid, anchor_xy_norm=(0.5, 0.5), margin_xy_px=(0, 0))
+        self.style.scale = old_scale
+        return out_img
 
     # .................................................................................................................
 
@@ -291,7 +308,8 @@ def find_minimum_text_height(text_drawer: TextDrawer, example_text=None, padding
     return txt_h + txt_base + 2 * padding_px
 
 
-# %%
+# ---------------------------------------------------------------------------------------------------------------------
+# %% Demo
 
 if __name__ == "__main__":
 
@@ -299,12 +317,20 @@ if __name__ == "__main__":
     txt2 = TextDrawer(2, 2, color=(0, 0, 255))
 
     image = np.zeros((480, 640, 3), dtype=np.uint8)
-    image = txt2.xy_norm(image, "X=0.25", (0.25, 1), anchor_xy_norm=(0.5, 1))
-    image = txt2.xy_norm(image, "AncX=0.75", (0.75, 1), anchor_xy_norm=None, color=(0, 255, 0))
+    image = txt2.xy_norm(image, "X=0.25", (0.25, 0.1), color=(0, 255, 255))
+    image = txt2.xy_norm(image, "AncX=0.75", (0.75, 0.9), color=(255, 255, 0))
     image = txt2.xy_centered(image, "**CENTERED**", color=(0, 255, 255))
-    image = txt1.xy_norm(image, "LEFT-ANCHORED", (0.5, 0.20), (0, 0.5))
-    image = txt1.xy_norm(image, "RIGHT-ANCHORED", (0.5, 0.25), (1, 0.5))
+    image = txt1.xy_norm(image, "LEFT-ANCHORED", (0.5, 0.25), (0, 0.5))
+    image = txt1.xy_norm(image, "RIGHT-ANCHORED", (0.5, 0.75), (1, 0.5))
 
-    cv2.imshow("Example", image)
-    keypress = cv2.waitKey(0)
+    image = txt1.xy_norm(image, "Top-Left", (0, 0))
+    image = txt1.xy_norm(image, "Bot-Left", (0, 1))
+    image = txt1.xy_norm(image, "Top-Right", (1, 0))
+    image = txt1.xy_norm(image, "Bot-Right", (1, 1))
+
+    while True:
+        cv2.imshow("Example - esc to close", image)
+        keypress = cv2.waitKey(0)
+        if keypress == 27:
+            break
     cv2.destroyAllWindows()

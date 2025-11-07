@@ -98,7 +98,8 @@ class Slider(CachedBgFgElement):
             bg_text=bg_text,
             label_xy_norm=(0, 0.5),
             label_anchor_xy_norm=None,
-            label_offset_xy_px=(5, 0),
+            label_offset_xy_px=(0, 0),
+            label_margin_xy_px=(5, 0),
         )
 
         # Inherit from parent
@@ -200,6 +201,7 @@ class Slider(CachedBgFgElement):
             self.style.label_xy_norm,
             anchor_xy_norm=self.style.label_anchor_xy_norm,
             offset_xy_px=self.style.label_offset_xy_px,
+            margin_xy_px=self.style.label_margin_xy_px,
         )
 
     def _rerender_fg(self, bg_image: ndarray) -> ndarray:
@@ -323,7 +325,8 @@ class MultiSlider(CachedBgFgElement):
             bg_text=bg_text,
             label_xy_norm=(0, 0.5),
             label_anchor_xy_norm=None,
-            label_offset_xy_px=(5, 0),
+            label_offset_xy_px=(0, 0),
+            label_margin_xy_px=(5, 0),
             outline_color=(0, 0, 0),
         )
 
@@ -449,6 +452,7 @@ class MultiSlider(CachedBgFgElement):
             self.style.label_xy_norm,
             anchor_xy_norm=self.style.label_anchor_xy_norm,
             offset_xy_px=self.style.label_offset_xy_px,
+            margin_xy_px=self.style.label_margin_xy_px,
         )
 
     def _rerender_fg(self, image: ndarray) -> ndarray:
@@ -594,6 +598,7 @@ class ColorSlider(Slider):
             self.style.label_xy_norm,
             anchor_xy_norm=self.style.label_anchor_xy_norm,
             offset_xy_px=self.style.label_offset_xy_px,
+            margin_xy_px=self.style.label_margin_xy_px,
         )
 
     # .................................................................................................................

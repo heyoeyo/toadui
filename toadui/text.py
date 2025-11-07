@@ -51,6 +51,7 @@ class TextBlock(CachedBgFgElement):
             text=TextDrawer(scale=text_scale, color=fg_color, max_height=height),
             text_align_xy=(0.5, 0.5),
             text_offset_xy_px=(0, 0),
+            text_margin_xy_px=(0, 0),
             outline_color=(0, 0, 0),
         )
 
@@ -84,6 +85,7 @@ class TextBlock(CachedBgFgElement):
             self._curr_text,
             self.style.text_align_xy,
             offset_xy_px=self.style.text_offset_xy_px,
+            margin_xy_px=self.style.text_margin_xy_px,
         )
         return draw_box_outline(bg_image, color=self.style.outline_color)
 
@@ -190,8 +192,10 @@ class TwoLineTextBlock(CachedBgFgElement):
             text_align_xy_l2=(0, 0.5),
             text_anchor_xy_l1=None,
             text_anchor_xy_l2=None,
-            text_offset_xy_px_l1=(5, 0),
-            text_offset_xy_px_l2=(5, 0),
+            text_offset_xy_px_l1=(0, 0),
+            text_offset_xy_px_l2=(0, 0),
+            text_margin_xy_px_l1=(5, 0),
+            text_margin_xy_px_l2=(5, 0),
         )
 
         # Set up element sizing
@@ -227,10 +231,12 @@ class TwoLineTextBlock(CachedBgFgElement):
     def _rerender_fg(self, bg_image: ndarray) -> ndarray:
 
         # For convenience
-        l1_xy_off = self.style.text_offset_xy_px_l1
-        l2_xy_off = self.style.text_offset_xy_px_l2
         l1_anc = self.style.text_anchor_xy_l1
         l2_anc = self.style.text_anchor_xy_l2
+        l1_xy_off = self.style.text_offset_xy_px_l1
+        l2_xy_off = self.style.text_offset_xy_px_l2
+        l1_marg = self.style.text_margin_xy_px_l1
+        l2_marg = self.style.text_margin_xy_px_l2
 
         # Figure out offset y-positioning (to get 2-line effect)
         l1_x, l1_y = self.style.text_align_xy_l1
@@ -243,8 +249,8 @@ class TwoLineTextBlock(CachedBgFgElement):
         l2_yf = (l2_y * l2_weight) + l1_weight
 
         # Re-draw line 1 & line 2 text, offset from center
-        self.style.text_l1.xy_norm(bg_image, self._l1_str, (l1_x, l1_yf), l1_anc, l1_xy_off)
-        self.style.text_l2.xy_norm(bg_image, self._l2_str, (l2_x, l2_yf), l2_anc, l2_xy_off)
+        self.style.text_l1.xy_norm(bg_image, self._l1_str, (l1_x, l1_yf), l1_anc, l1_xy_off, l1_marg)
+        self.style.text_l2.xy_norm(bg_image, self._l2_str, (l2_x, l2_yf), l2_anc, l2_xy_off, l2_marg)
 
         return draw_box_outline(bg_image, color=self.style.outline_color)
 

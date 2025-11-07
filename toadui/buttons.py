@@ -815,7 +815,7 @@ class RadioBar(CachedBgFgElement):
         new_img = blank_image(h, w, self.style.color_off)
         for label, label_x_norm in zip(self._labels, self._btn_xmid_norm):
             txt_xy = (label_x_norm, 0.5)
-            self.style.text_off.xy_norm(new_img, label, txt_xy, anchor_xy_norm=(0.5, 0.5))
+            self.style.text_off.xy_norm(new_img, label, txt_xy, anchor_xy_norm=(0.5, 0.5), margin_xy_px=(0, 0))
 
         return draw_box_outline(new_img, self.style.outline_color)
 
@@ -830,7 +830,9 @@ class RadioBar(CachedBgFgElement):
         # Paint over active button with 'on' colors
         txt_xy_norm = (self._btn_xmid_norm[self._active_idx], 0.5)
         new_img = cv2.rectangle(bg_image, pt1, pt2, self.style.color_on, -1)
-        self.style.text_on.xy_norm(new_img, self._labels[self._active_idx], txt_xy_norm, anchor_xy_norm=(0.5, 0.5))
+        self.style.text_on.xy_norm(
+            new_img, self._labels[self._active_idx], txt_xy_norm, anchor_xy_norm=(0.5, 0.5), margin_xy_px=(0, 0)
+        )
 
         return draw_box_outline(new_img)
 
@@ -865,6 +867,6 @@ class RadioBar(CachedBgFgElement):
 
         # Re-draw the button text in the on-state to indicate hover
         txt_xy = (self._btn_xmid_norm[hover_idx], 0.5)
-        self.style.text_on.xy_norm(hover_img, hover_label, txt_xy, anchor_xy_norm=(0.5, 0.5))
+        self.style.text_on.xy_norm(hover_img, hover_label, txt_xy, anchor_xy_norm=(0.5, 0.5), margin_xy_px=(0, 0))
 
         return hover_img

@@ -274,12 +274,14 @@ class TextOverlay(BaseOverlay):
         line_type: OCVLineType = cv2.LINE_AA,
         anchor_xy_norm: XYNORM | None = None,
         offset_xy_px: XYPX = (0, 0),
+        margin_xy_px: XYPX = (5, 5),
     ):
         super().__init__(base_item)
         self._text = None
         self._xy_norm = xy_norm
         self._anchor_xy_norm = anchor_xy_norm
         self._offset_xy_px = offset_xy_px
+        self._margin_xy_px = margin_xy_px
         self.style = UIStyle(text=TextDrawer(scale, thickness, color, bg_color, font, line_type))
         self.style.text = TextDrawer(scale, thickness, color, bg_color, font, line_type)
 
@@ -296,6 +298,7 @@ class TextOverlay(BaseOverlay):
         xy_norm: XYNORM | None = None,
         anchor_xy_norm: XYNORM | None = None,
         offset_xy_px: XYPX | None = None,
+        margin_xy_px: XYPX | None = None,
     ) -> SelfType:
 
         if xy_norm is not None:
@@ -304,6 +307,8 @@ class TextOverlay(BaseOverlay):
             self._anchor_xy_norm = anchor_xy_norm
         if offset_xy_px is not None:
             self._offset_xy_px = offset_xy_px
+        if margin_xy_px is not None:
+            self._margin_xy_px = margin_xy_px
 
         return self
 
@@ -314,7 +319,9 @@ class TextOverlay(BaseOverlay):
         if self._text is None:
             return frame
 
-        return self.style.text.xy_norm(frame, self._text, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px)
+        return self.style.text.xy_norm(
+            frame, self._text, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px, self._margin_xy_px
+        )
 
     # .................................................................................................................
 
@@ -569,6 +576,7 @@ class HoverLabelOverlay(BaseOverlay):
         bg_color: COLORU8 = (0, 0, 0),
         anchor_xy_norm: XYNORM | None = None,
         offset_xy_px: XYPX = (0, 0),
+        margin_xy_px: XYPX = (5, 5),
     ):
         self._label = label
         self._idle_timeout_ms = idle_timeout_ms
@@ -583,6 +591,7 @@ class HoverLabelOverlay(BaseOverlay):
         self._xy_norm = xy_norm
         self._anchor_xy_norm = anchor_xy_norm
         self._offset_xy_px = offset_xy_px
+        self._margin_xy_px = margin_xy_px
 
         # Inherit from parent
         super().__init__(base_item)
@@ -608,7 +617,7 @@ class HoverLabelOverlay(BaseOverlay):
             self._need_text = self._is_in_region and (curr_time_ms < self._timeout_target_ms)
             if self._need_text:
                 return self.style.text.xy_norm(
-                    frame, self._label, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px
+                    frame, self._label, self._xy_norm, self._anchor_xy_norm, self._offset_xy_px, self._margin_xy_px
                 )
 
         return frame
