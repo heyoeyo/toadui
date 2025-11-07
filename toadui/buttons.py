@@ -18,7 +18,7 @@ from toadui.helpers.sizing import get_image_hw_to_fit_region, resize_hw
 
 # For type hints
 from numpy import ndarray
-from toadui.helpers.types import COLORU8, SelfType
+from toadui.helpers.types import COLORU8, SelfType, HWPairPX
 from toadui.helpers.ocv_types import OCVInterp
 
 
@@ -164,6 +164,7 @@ class ToggleImageButton(BaseCallback):
         toggle_image: ndarray | None = None,
         default_state: bool = False,
         include_box_outline: bool = True,
+        show_outline_on_toggle: bool | None = None,
         resize_interpolation: OCVInterp = cv2.INTER_AREA,
         height: int | None = None,
         minimum_width: int | None = None,
@@ -171,6 +172,10 @@ class ToggleImageButton(BaseCallback):
         is_flexible_h: bool = False,
         is_flexible_w: bool = True,
     ):
+
+        # If toggle outline isn't set, only use it if a toggle image isn't provided
+        if show_outline_on_toggle is None:
+            show_outline_on_toggle = toggle_image is None
 
         # Fill in missing image data, if needed
         if default_image.ndim < 3:
@@ -184,22 +189,34 @@ class ToggleImageButton(BaseCallback):
         if minimum_width is None:
             minimum_width = default_image.shape[1]
 
-        # Storage for cached data
+        # Storage for sizing
         self._default_ar = default_image.shape[1] / default_image.shape[0]
+        self._is_default_on_state = default_state
+        self._is_unique_toggle_image = toggle_image is not None
+
+        # Storage for cached data
         self._off_img = toggle_image if default_state else default_image
         self._on_img = default_image if default_state else toggle_image
         self._cached_off_img = blank_image(1, 1)
         self._cached_on_img = blank_image(1, 1)
         self._fill_to_fit = fill_to_fit_space
+        self._show_outline_on_toggle = show_outline_on_toggle
 
         # Storage for toggle state
         self._is_on = default_state
         self._is_changed = True
 
         # Set up element styling
+        outline_hover_color = (255, 255, 255)
+        outline_off_color = (0, 0, 0)
+        outline_on_color = outline_hover_color if show_outline_on_toggle else outline_off_color
         self.style = UIStyle(
-            outline_color=(0, 0, 0) if include_box_outline else None,
-            outline_hover_color=(255, 255, 255) if include_box_outline else None,
+            outline_off_color=outline_off_color if include_box_outline else None,
+            outline_on_color=outline_on_color if include_box_outline else None,
+            outline_hover_color=outline_hover_color if include_box_outline else None,
+            outline_off_thickness=1,
+            outline_on_thickness=2 if show_outline_on_toggle else 1,
+            outline_hover_thickness=1,
             resize_interpolation=resize_interpolation,
             fill_color=(0, 0, 0),
             fill_style=cv2.BORDER_REPLICATE,
@@ -209,6 +226,17 @@ class ToggleImageButton(BaseCallback):
         super().__init__(height, minimum_width, is_flexible_h, is_flexible_w)
 
     # .................................................................................................................
+
+    def get_render_hw(self) -> HWPairPX:
+        """
+        Report the most recent render resolution of the button/image.
+        This can be used to scale new images to match previous render sizes,
+        which can help reduce jittering when giving images that repeatedly change size.
+        Returns:
+            render_height, render_width
+        """
+        ref_img = self._cached_on_img if self._is_on else self._cached_off_img
+        return HWPairPX(ref_img.shape[0], ref_img.shape[1])
 
     def read(self) -> tuple[bool, bool]:
         """Returns: is_changed, current_state"""
@@ -227,6 +255,43 @@ class ToggleImageButton(BaseCallback):
     def set_is_changed(self, is_changed: bool = True) -> SelfType:
         """Artificially set change state"""
         self._is_changed = is_changed
+        return self
+
+    # .................................................................................................................
+
+    def set_default_image(self, default_image: ndarray, set_toggle_image: bool = False) -> SelfType:
+        """
+        Update image of button in default state. If 'set_toggle_image' is True,
+        then the toggle image will be updated with the same image
+        """
+
+        # Replace the appropriate 'default' image & cache to force re-render
+        if self._is_default_on_state:
+            self._on_img = default_image
+            self._cached_on_img = blank_image(1, 1)
+        else:
+            self._off_img = default_image
+            self._cached_off_img = blank_image(1, 1)
+
+        # Update AR for proper resizing
+        self._default_ar = default_image.shape[1] / default_image.shape[0]
+
+        # Use same image for default/toggle
+        if set_toggle_image:
+            self.set_toggle_image(default_image)
+
+        return self
+
+    def set_toggle_image(self, toggle_image: ndarray) -> SelfType:
+        """Update image of button in toggled state"""
+
+        if self._is_default_on_state:
+            self._off_img = toggle_image
+            self._cached_off_img = blank_image(1, 1)
+        else:
+            self._on_img = toggle_image
+            self._cached_on_img = blank_image(1, 1)
+
         return self
 
     # .................................................................................................................
@@ -256,13 +321,17 @@ class ToggleImageButton(BaseCallback):
                 on_img = pad_image_to_hw(on_img, h, w, self.style.fill_color, self.style.fill_style)
 
             # Store images for re-use
-            self._cached_off_img = draw_box_outline(off_img, self.style.outline_color)
-            self._cached_on_img = draw_box_outline(on_img, self.style.outline_color)
+            self._cached_off_img = draw_box_outline(
+                off_img, self.style.outline_off_color, self.style.outline_off_thickness
+            )
+            self._cached_on_img = draw_box_outline(on_img, self.style.outline_on_color, self.style.outline_on_thickness)
 
         # Draw button with outline
         btn_img = self._cached_on_img if self._is_on else self._cached_off_img
         if self.is_hovered():
-            btn_img = draw_box_outline(btn_img.copy(), self.style.outline_hover_color)
+            btn_img = draw_box_outline(
+                btn_img.copy(), self.style.outline_hover_color, self.style.outline_hover_thickness
+            )
 
         return btn_img
 
@@ -410,6 +479,16 @@ class ImmediateImageButton(BaseCallback):
 
     # .................................................................................................................
 
+    def get_render_hw(self) -> HWPairPX:
+        """
+        Report the most recent render resolution of the button/image.
+        This can be used to scale new images to match previous render sizes,
+        which can help reduce jittering when giving images that repeatedly change size.
+        Returns:
+            render_height, render_width
+        """
+        return HWPairPX(self._cached_img.shape[0], self._cached_img.shape[1])
+
     def read(self) -> bool:
         is_changed = self._is_changed
         self._is_changed = False
@@ -417,6 +496,17 @@ class ImmediateImageButton(BaseCallback):
 
     def click(self) -> SelfType:
         self._is_changed = True
+        return self
+
+    # .................................................................................................................
+
+    def set_image(self, image: ndarray) -> SelfType:
+        """Update button image"""
+
+        self._orig_ar = image.shape[1] / image.shape[0]
+        self._orig_img = image
+        self._cached_img = blank_image(1, 1)
+
         return self
 
     # .................................................................................................................
