@@ -258,6 +258,13 @@ class TwoLineTextBlock(CachedBgFgElement):
 
 
 class MessageBar(BaseCallback):
+    """
+    UI element that can display multiple separate text entries, spaced apart horizontally
+
+    If 'use_equal_width' is True, each message will be assigned the same width
+    and will be drawn centered in the assigned space. If False, then messages will
+    be drawn so that there is equal space between each message.
+    """
 
     # .................................................................................................................
 
@@ -267,12 +274,15 @@ class MessageBar(BaseCallback):
         text_scale: float = 0.5,
         color: COLORU8 | int = (150, 110, 15),
         height: int = 40,
-        space_equally: bool = False,
+        use_equal_width: bool = False,
         is_flexible_w: bool = True,
     ):
 
         # Store messages with front/back padding for nicer spacing on display (and skip 'None' entries)
-        self._msgs_list = [f" {msg}  " for msg in messages if msg is not None]
+        include_space_gaps = use_equal_width
+        self._msgs_list = [f" {msg}  " if include_space_gaps else str(msg) for msg in messages if msg is not None]
+        if len(self._msgs_list) == 0:
+            self._msgs_list = [""]
 
         # Store visual settings
         color = interpret_coloru8(color)
@@ -287,24 +297,20 @@ class MessageBar(BaseCallback):
             new_scale = text_scale * (height / txt_h) * 0.8
             text_draw.style.scale = new_scale
 
-        # Record message widths, used to assign space when minimum drawing size
+        # Record message widths, needed for figuring out drawing positioning
         msg_widths = [text_draw.get_text_size(m)[1] for m in self._msgs_list]
         total_msg_w = sum(msg_widths)
-
-        # Pre-compute the relative x-positioning of each message for display
-        cumulative_w = [sum(msg_widths[:k]) for k in range(len(self._msgs_list))]
-        self._msg_x_norms = [(cum_w + 0.5 * msg_w) / total_msg_w for cum_w, msg_w in zip(cumulative_w, msg_widths)]
-        if space_equally:
-            num_msgs = len(msg_widths)
-            self._msg_x_norms = [(k + 0.5) / num_msgs for k in range(num_msgs)]
-            total_msg_w = max(msg_widths) * num_msgs
-        self._space_equal = space_equally
+        self._msg_widths_px = msg_widths
+        self._total_msg_width_px = total_msg_w
+        self._use_equal_width = use_equal_width
 
         # Set up element styling
         self.style = UIStyle(
             color=color,
             outline_color=(0, 0, 0),
             text=text_draw,
+            y_alignment=0.5,
+            margin_xy_px=(12, 0) if not use_equal_width else (0, 0),
         )
 
         # Inherit from parent & render initial image to cache results
@@ -318,10 +324,39 @@ class MessageBar(BaseCallback):
         # Re-draw image when sizing has changed
         img_h, img_w = self._cached_img.shape[0:2]
         if img_h != h or img_w != w:
+
+            # Re-draw each message with proper positioning according to new render size
             msg_img = blank_image(h, w, self.style.color)
-            for msg_str, x_norm in zip(self._msgs_list, self._msg_x_norms):
-                msg_img = self.style.text.xy_norm(msg_img, msg_str, (x_norm, 0.5), anchor_xy_norm=(0.5, 0.5))
-            msg_img = draw_box_outline(msg_img, self.style.outline_color)
+            msg_y = self.style.y_alignment
+            marg_x, marg_y = self.style.margin_xy_px
+            num_msgs = len(self._msgs_list)
+            txtdraw: TextDrawer = self.style.text
+            if num_msgs == 1:
+                # Special case, draw single entries centered
+                txtdraw.xy_norm(msg_img, self._msgs_list[0], (0.5, msg_y), margin_xy_px=(0, 0))
+
+            elif self._use_equal_width:
+                # Draw each message with centers equally spread around the available space
+                shared_kwargs = {"anchor_xy_norm": (0.5, msg_y), "margin_xy_px": (marg_x, marg_y)}
+                msg_x_norms = [(k + 0.5) / num_msgs for k in range(num_msgs)]
+                for msg_str, x_norm in zip(self._msgs_list, msg_x_norms):
+                    txtdraw.xy_norm(msg_img, msg_str, (x_norm, msg_y), **shared_kwargs)
+
+            else:
+                # Draw each message so that there are equal sized gaps between them
+                # (note, we're handling x-margins manually, needed for absolute positioning calculations)
+                total_draw_space = w - 2 * marg_x
+                num_total_gaps = num_msgs - 1
+                gap_size_px = (total_draw_space - self._total_msg_width_px) / max(1, num_total_gaps)
+                shared_kwargs = {"anchor_xy_norm": (0.5, msg_y), "margin_xy_px": (0, marg_y)}
+                for msg_idx, msg_str in enumerate(self._msgs_list):
+                    prev_gap_w = msg_idx * gap_size_px
+                    prev_msg_w = sum(self._msg_widths_px[:msg_idx])
+                    curr_msg_half_w = self._msg_widths_px[msg_idx] * 0.5
+                    curr_msg_x_px = prev_gap_w + prev_msg_w + curr_msg_half_w + marg_x
+                    x_norm = curr_msg_x_px / w
+                    txtdraw.xy_norm(msg_img, msg_str, (x_norm, msg_y), **shared_kwargs)
+                pass
 
             # Cache image for re-use
             self._cached_img = msg_img
