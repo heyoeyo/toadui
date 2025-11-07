@@ -218,7 +218,7 @@ class VStack(BaseCallback):
     def __init__(
         self,
         *items: BaseCallback | None,
-        flex: tuple | None = None,
+        flex: Iterable[float | None] | None = None,
         min_h: int | None = None,
         error_on_size_constraints: bool = False,
     ):
@@ -407,14 +407,25 @@ class VStack(BaseCallback):
 
 class GridStack(BaseCallback):
     """
-    Layout which combines elements into a grid with a specified number of rows and columns
-    Items should be given in 'row-first' format (i.e. items fill out grid row-by-row)
+    Layout which combines elements into a grid with a specified number of rows and columns.
+    This is a convenience wrapper around a combination of:
+        VStack(HStack(...), HStack(...), ...) (row ordered)
+        or
+        HStack(VStack(...), VStack(...), ...) (column ordered)
     """
 
     # .................................................................................................................
 
-    def __init__(self, *items, num_rows=None, num_columns=None, target_aspect_ratio=1):
+    def __init__(
+        self,
+        *items,
+        num_rows: int | None = None,
+        num_columns: int | None = None,
+        target_aspect_ratio: float = 1,
+        is_row_ordered: bool = True,
+    ):
 
+        # Inherit from parent
         super().__init__(128, 128)
         self._append_cb_children(*items)
 
@@ -429,19 +440,11 @@ class GridStack(BaseCallback):
         self._num_rows = num_rows
         self._num_cols = num_columns
 
-        # Update stack sizing based on children
-        min_h_per_row = []
-        for _, child_per_row in self.row_iter():
-            min_h_per_row.append(max(child._cb_rdr.min_h for child in child_per_row))
-        min_w_per_col = []
-        for _, child_per_col in self.column_iter():
-            min_w_per_col.append(max(child._cb_rdr.min_w for child in child_per_col))
-        total_min_h = sum(min_h_per_row)
-        total_min_w = sum(min_w_per_col)
-        is_flex_h = any(child._cb_rdr.is_flexible_h for child in self)
-        is_flex_w = any(child._cb_rdr.is_flexible_w for child in self)
-        self._cb_rdr = CBRenderSizing(total_min_h, total_min_w, is_flex_h, is_flex_w)
+        # Store ordering info
+        self._is_row_ordered = is_row_ordered
+        self._layout: VStack | HStack = self._rebuild_layout()
 
+        # Set up element styling when having to pad child items
         self.style = UIStyle(
             pad_color=(0, 0, 0),
             pad_border_type=cv2.BORDER_CONSTANT,
@@ -449,15 +452,51 @@ class GridStack(BaseCallback):
 
     # .................................................................................................................
 
-    def get_row_columns(self) -> tuple[int, int]:
+    def get_num_rows_columns(self) -> tuple[int, int]:
         """Get current row/column count of the grid layout"""
         return (self._num_rows, self._num_cols)
+
+    def set_num_rows_columns(self, num_rows: int, num_columns: int) -> SelfType:
+        """Update the number of rows & columns of the grid"""
+        self._num_rows = num_rows
+        self._num_cols = num_columns
+        return self
+
+    def increment_num_rows(self, increment: int = 1) -> SelfType:
+        """Change the grid arrangement by increasing the number of rows"""
+
+        num_items = len(self)
+        rowcol_options = self.get_row_column_options(num_items)
+        curr_rowcol = self.get_num_rows_columns()
+
+        # Figure out which of the options we are currently using (or close to)
+        curr_opt_idx = rowcol_options.index(curr_rowcol) if curr_rowcol in rowcol_options else None
+        if curr_opt_idx is None:
+            possible_row_indices = [row_idx for row_idx, _ in rowcol_options if row_idx <= curr_rowcol[0]]
+            curr_opt_idx = max(0, len(possible_row_indices) - 1)
+
+        # Use the next row/column count
+        next_opt_idx = (curr_opt_idx + increment) % len(rowcol_options)
+        num_rows, num_cols = rowcol_options[next_opt_idx]
+
+        # Update internal records
+        self._num_rows = num_rows
+        self._num_cols = num_cols
+        self._rebuild_layout()
+
+        return self
+
+    def decrement_num_rows(self, decrement: int = 1) -> SelfType:
+        """Change the grid arrangement by decreasing the number of rows"""
+        return self.increment_num_rows(-decrement)
 
     # .................................................................................................................
 
     def transpose(self) -> SelfType:
         """Flip number of rows & columns"""
         self._num_rows, self._num_cols = self._num_cols, self._num_rows
+        self._is_row_ordered = not self._is_row_ordered
+        self._rebuild_layout()
         return self
 
     # .................................................................................................................
@@ -527,150 +566,66 @@ class GridStack(BaseCallback):
 
     # .................................................................................................................
 
-    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+    def _render_up_to_size(self, h, w):
+        outimg = self._layout._render_up_to_size(h, w)
+        self._cb_region = self._layout._cb_region
+        return outimg
 
-        # Set up starting stack point, used to keep track of child callback regions
-        x_stack = self._cb_region.x1
-        y_stack = self._cb_region.y1
+    def _get_dynamic_aspect_ratio(self):
+        return self._layout._get_dynamic_aspect_ratio()
 
-        # Figure out how tall each row should be
-        ideal_h_per_row = h // self._num_rows
-        h_gap = h % self._num_rows
-        h_per_row = [ideal_h_per_row + int(idx < h_gap) for idx in range(self._num_rows)]
+    def _get_height_and_width_without_hint(self):
+        return self._layout._get_height_and_width_without_hint()
 
-        # Figure out how wide each column should be
-        ideal_w_per_col = w // self._num_cols
-        w_gap = w % self._num_cols
-        w_per_col = [ideal_w_per_col + int(idx < w_gap) for idx in range(self._num_cols)]
+    def _get_height_given_width(self, w):
+        return self._layout._get_height_given_width(w)
 
-        # Render all child items to target sizing
-        row_images_list = []
-        for row_idx, children_per_row in self.row_iter():
+    def _get_width_given_height(self, h):
+        return self._layout._get_width_given_height(h)
 
-            row_height = h_per_row[row_idx]
-            col_images_list = []
-            for col_idx, child in enumerate(children_per_row):
-                col_width = w_per_col[col_idx]
-                frame = child._render_up_to_size(row_height, col_width)
-                frame_h, frame_w = frame.shape[0:2]
+    def _rebuild_layout(self) -> VStack | HStack:
+        """
+        Helper used to re-build the internal V/HStack layout structure,
+        needed when the number of rows or columns changes
+        """
 
-                # Adjust frame width if needed
-                tpad, bpad, lpad, rpad = 0, 0, 0, 0
-                if (frame_h < row_height) or (frame_w < col_width):
-                    available_h, available_w = row_height - frame_h, col_width - frame_w
-                    lpad = available_w // 2
-                    rpad = available_w - lpad
-                    tpad = available_h // 2
-                    bpad = available_h - tpad
-                    ptype = self.style.pad_border_type
-                    pcolor = self.style.pad_color
-                    frame = cv2.copyMakeBorder(frame, tpad, bpad, lpad, rpad, ptype, value=pcolor)
+        # Set up parameters used to build layout for row-vs-column ordering
+        axis_alt_count = (self._num_cols, self._num_rows)
+        axis_alt_stack = (HStack, VStack)
+        axis_alt_sep = (HSeparator, HSeparator)
+        if not self._is_row_ordered:
+            axis_alt_count = tuple(reversed(axis_alt_count))
+            axis_alt_stack = tuple(reversed(axis_alt_stack))
+            axis_alt_sep = tuple(reversed(axis_alt_sep))
 
-                # Crop oversized heights
-                if frame_h > row_height:
-                    print(
-                        f"Render sizing error! ({child})",
-                        f"  Expecting height: {h}, got {frame_h}",
-                        "-> Will crop!",
-                        sep="\n",
-                    )
-                    frame = frame[:row_height, :, :]
-                    frame_h = row_height
+        # Build vertical stack of rows (row-order) or horizontal stack of column (column-order) layout
+        axis_count, alt_count = axis_alt_count
+        axis_stack, alt_stack = axis_alt_stack
+        axis_sep, alt_sep = axis_alt_sep
+        axis_stacks_list = []
+        for axis_idx in range(alt_count):
+            idx_offset = axis_idx * axis_count
+            item_slice = slice(idx_offset, idx_offset + axis_count)
+            item_list = self[item_slice]
+            axis_stacks_list.append(axis_stack(*item_list))
+        new_layout = alt_stack(*axis_stacks_list)
+        self._layout = new_layout
 
-                # Crop oversized widths
-                if frame_w > col_width:
-                    print(
-                        f"Render sizing error! ({child})",
-                        f"  Expecting width: {w}, got {frame_w}",
-                        "-> Will crop!",
-                        sep="\n",
-                    )
-                    frame = frame[:, :col_width, :]
-                    frame_w = col_width
+        # Update sizing constraints
+        min_h_list = [axis._cb_rdr.min_h for axis in new_layout]
+        min_w_list = [axis._cb_rdr.min_w for axis in new_layout]
+        is_flex_h = any(axis._cb_rdr.is_flexible_h for axis in new_layout)
+        is_flex_w = any(axis._cb_rdr.is_flexible_w for axis in new_layout)
+        min_h = sum(min_h_list) if self._is_row_ordered else max(min_h_list)
+        min_w = max(min_w_list) if self._is_row_ordered else sum(min_w_list)
+        self._cb_rdr = CBRenderSizing(min_h, min_w, is_flex_h, is_flex_w)
 
-                # Store image for forming row-images
-                col_images_list.append(frame)
-
-                # Provide callback region to child item
-                x1, y1 = x_stack + lpad, y_stack + tpad
-                x2, y2 = x1 + frame_w, y1 + frame_h
-                child._cb_region.resize(x1, y1, x2, y2)
-
-                # Update x-stacking point for each column
-                x_stack = x2 + rpad
-
-            # Combine all column images to form one row image, padding if needed
-            one_row_image = np.hstack(col_images_list)
-            _, one_row_w = one_row_image.shape[0:2]
-            if one_row_w < w:
-                pad_w = w - one_row_w
-                ptype = self.style.pad_border_type
-                pcolor = self.style.pad_color
-                one_row_image = cv2.copyMakeBorder(one_row_image, 0, 0, 0, pad_w, ptype, value=pcolor)
-            row_images_list.append(one_row_image)
-
-            # Reset x-stacking point & update y-stacking point, for each completed row
-            x_stack = self._cb_region.x1
-            y_stack = y_stack + row_height
-
-        return np.vstack(row_images_list)
-
-    # .................................................................................................................
-
-    def _get_height_and_width_without_hint(self) -> HWPX:
-        """Set height to the total of largest heights per row, width to the total largest widths per column"""
-
-        # Set height based on largest heights per row
-        max_h_per_row = []
-        for _, items_per_row in self.row_iter():
-            max_h_per_row.append(max(item._cb_rdr.min_h for item in items_per_row))
-        height = sum(max_h_per_row)
-
-        # Set width based on largest widths per column
-        max_w_per_col = []
-        for _, items_per_col in self.column_iter():
-            max_w_per_col.append(max(item._cb_rdr.min_w for item in items_per_col))
-        width = sum(max_w_per_col)
-
-        return height, width
-
-    def _get_height_given_width(self, w: int) -> int:
-        """Set height to the sum of the tallest elements per row"""
-
-        # Figure out width of each column (assuming equal assignment)
-        ideal_w_per_col = w // self._num_cols
-        w_gap = w % self._num_cols
-        w_per_col = [ideal_w_per_col + int(idx < w_gap) for idx in range(self._num_cols)]
-
-        # Sum up all widths per row
-        heights_per_row = [[] for _ in range(self._num_rows)]
-        for row_idx, col_idx, child in self.grid_iter():
-            heights_per_row[row_idx].append(child._get_height_given_width(w=w_per_col[col_idx]))
-
-        # Set height to the total height based on tallest item per row stacked together
-        max_height_per_row = [max(row_heights) for row_heights in heights_per_row]
-        return sum(max_height_per_row)
-
-    def _get_width_given_height(self, h: int) -> int:
-        """Set width to the widest row"""
-
-        # Figure out height of each row (assuming equal assignment)
-        ideal_h_per_row = h // self._num_rows
-        h_gap = h % self._num_rows
-        h_per_row = [ideal_h_per_row + int(idx < h_gap) for idx in range(self._num_rows)]
-
-        # Sum up all widths per row
-        total_w_per_row = [0] * self._num_rows
-        for row_idx, col_idx, child in self.grid_iter():
-            total_w_per_row[row_idx] += child._get_width_given_height(h=h_per_row[row_idx])
-
-        # Set width to the widest row
-        return max(total_w_per_row)
+        return self._layout
 
     # .................................................................................................................
 
     @staticmethod
-    def get_row_column_options(num_items: int) -> tuple[tuple[int, int]]:
+    def get_row_column_options(num_items: int, include_all_row_counts=False) -> tuple[tuple[int, int]]:
         """
         Helper used to get all possible neatly divisible combinations of (num_rows, num_columns)
         for a given number of items, in order of fewest rows -to- most rows.
@@ -681,7 +636,18 @@ class GridStack(BaseCallback):
 
         As another example, for num_items = 12, returns:
             ((1, 12), (2, 6), (3, 4), (4, 3), (6, 2), (12, 1))
+
+        If 'include_all_row_counts' is True, the all possible 'number of rows' will be considered.
+        This can lead to a total number of grid cells which exceeds the number of items!
+        For example, for num_items = 5, normally the result would be:
+            ((1, 5), (5, 1))
+        But with include_all_row_counts=True, the result is instead:
+            ((1, 5), (2, 3), (3, 2), (4, 2), (5, 1))
+        Note that all row counts are present (1, 2, 3, 4, 5), but some (e.g. (2, 3) or (4, 2))
+        result in a total number of cells (6 and 8 respectively) which exceed the item count of 5!
         """
+        if include_all_row_counts:
+            return tuple((k, int(np.ceil(num_items / k))) for k in range(1, 1 + num_items))
         return tuple((k, num_items // k) for k in range(1, 1 + num_items) if (num_items % k) == 0)
 
     # .................................................................................................................
@@ -829,10 +795,8 @@ class Swapper(BaseCallback):
         is_none_keys = [k is None for k in keys]
         is_none_items = [item is None for item in swap_items]
         need_remove_list = [any(none_key_or_item) for none_key_or_item in zip(is_none_keys, is_none_items)]
-
         items = tuple(item for item, remove in zip(swap_items, need_remove_list) if not remove)
         keys = tuple(key for key, remove in zip(keys, need_remove_list) if not remove)
-        # reverse_key_lut = {item: key for item, key in zip(items, keys)}
 
         # Sanity check
         num_keys, num_items = len(keys), len(items)
@@ -840,10 +804,11 @@ class Swapper(BaseCallback):
         assert num_keys == num_items, f"Number of keys ({num_keys}) must match number of swap items ({num_items})"
 
         # Store items for swapping
+        self._is_changed = True
         self._items: tuple[BaseCallback] = items
         self._swap_idx: int = initial_index
         self._num_items: int = len(self._items)
-        self._key_lut = {key: idx for idx, key in enumerate(keys)}
+        self._key_to_idx_lut = {key: idx for idx, key in enumerate(keys)}
 
         item_rdr = self._items[initial_index]._cb_rdr
         super().__init__(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
@@ -857,6 +822,17 @@ class Swapper(BaseCallback):
 
     # .................................................................................................................
 
+    def get_active_element(self) -> BaseCallback:
+        """Helper used to access the currently active swap item (without reading or consuming 'is changed')"""
+        return self._items[self._swap_idx]
+
+    def read(self) -> tuple[bool, int, BaseCallback]:
+        """Get a reference to the current swap element. Returns: is_changed, swap_index, swap_element"""
+        is_changed, self._is_changed = self._is_changed, False
+        return is_changed, self._swap_idx, self._items[self._swap_idx]
+
+    # .................................................................................................................
+
     def set_swap_index(self, swap_index: int) -> BaseCallback:
         """
         Swap to a new item, by index
@@ -867,6 +843,7 @@ class Swapper(BaseCallback):
             if swap_index != self._swap_idx:
                 self._swap_idx = swap_index
                 self._update_render_sizing()
+                self._is_changed = True
         return self._items[self._swap_idx]
 
     def set_swap_key(self, swap_key: Any) -> BaseCallback:
@@ -875,7 +852,7 @@ class Swapper(BaseCallback):
         Returns:
             current_swap_item
         """
-        new_idx = self._key_lut[swap_key]
+        new_idx = self._key_to_idx_lut[swap_key]
         return self.set_swap_index(new_idx)
 
     # .................................................................................................................

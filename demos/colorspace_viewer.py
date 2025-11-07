@@ -225,8 +225,9 @@ num_grid_rows = 2
 is_very_tall, is_very_wide = input_ar < 0.5, input_ar > 2
 num_grid_rows = 4 if (is_very_wide or force_wide_ui) else num_grid_rows
 num_grid_rows = 1 if (is_very_tall or force_tall_ui) else num_grid_rows
+img_grid = GridStack(bgr_img_elem, ch1_swap, ch2_swap, ch3_swap, num_rows=num_grid_rows)
 img_swap_elem = Swapper(
-    GridStack(bgr_img_elem, ch1_swap, ch2_swap, ch3_swap, num_rows=num_grid_rows),
+    img_grid,
     bgr_img_elem,
     keys=("grid", "frame-only"),
 )
@@ -255,6 +256,7 @@ window.attach_keypress_callbacks(
     {
         "Toggle playback": {" ": vreader.toggle_pause} if not is_image_source else None,
         "Switch colorspaces": {KEY.L_ARROW: cspace_radio.prev, KEY.R_ARROW: cspace_radio.next},
+        "Adjust grid layout": {",": img_grid.increment_num_rows, ".": img_grid.decrement_num_rows},
         "Toggle channel view": {"c": show_channels_btn.toggle},
         "Toggle original": {"d": disable_adjustments_btn.toggle},
         "Toggle histograms": {"h": show_histos_btn.toggle},
