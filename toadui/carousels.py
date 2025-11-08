@@ -7,7 +7,6 @@
 
 from pathlib import Path
 
-import cv2
 import numpy as np
 
 from toadui.base import CachedBgFgElement
@@ -518,18 +517,6 @@ class PathCarousel(TextCarousel):
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Functions
-
-
-def load_valid_image(image_path: str | Path) -> tuple[bool, ndarray | None]:
-    """
-    Helper used to provide a True/False flag indicating if a loaded image is valid.
-    Meant to be used with PathCarousel 'load_next_valid' functionality.
-    Returns:
-        is_valid, image_data
-    """
-    img_data = cv2.imread(image_path)
-    is_valid = img_data is not None
-    return is_valid, img_data
 
 
 def make_load_valid_ext_func(ext: str | list[str], case_insensitive=True) -> Callable[[Path], bool]:

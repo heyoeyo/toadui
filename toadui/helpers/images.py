@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
+from pathlib import Path
 from dataclasses import dataclass
 from base64 import b64decode, b64encode
 
@@ -83,6 +84,17 @@ class CropData:
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Functions
+
+
+def load_valid_image(image_path: str | Path) -> tuple[bool, ndarray | None]:
+    """
+    Helper used to provide a True/False flag indicating if a loaded image is valid.
+    Returns:
+        is_valid, image_data
+    """
+    img_data = cv2.imread(image_path)
+    is_valid = img_data is not None
+    return is_valid, img_data
 
 
 def blank_image(height: int, width: int, bgr_color: None | int | COLORU8 = None) -> ndarray:
