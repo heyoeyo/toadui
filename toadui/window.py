@@ -205,7 +205,17 @@ class DisplayWindow:
                 # Convert from string to int (code) if needed
                 kcode = key_code
                 if isinstance(kcode, str):
-                    kcode = ord(kcode.lower())
+                    lowered_kcode = kcode.lower()
+                    if len(kcode) > 1:
+                        is_known_code = lowered_kcode in KEYNAMES_TO_CODES.keys()
+                        if not is_known_code:
+                            cv2.destroyAllWindows()
+                            valid_names_str = ", ".join(KEYNAMES_TO_CODES.keys())
+                            raise NameError(f"Unknown key name ({kcode}), must be one of: {valid_names_str}")
+                        kcode = KEYNAMES_TO_CODES[lowered_kcode]
+                    else:
+                        kcode = ord(lowered_kcode)
+                    pass
 
                 # Get user-friendly name for key, if possible
                 is_known_key, name = KEY.get_keycode_name(kcode)
@@ -441,3 +451,21 @@ class KEY(IntEnum):
         contains_kcode = code in tuple(cls)
         name = cls(code).name if contains_kcode else None
         return contains_kcode, name
+
+
+KEYNAMES_TO_CODES: dict[str, int] = {
+    "l_arrow": KEY.L_ARROW,
+    "u_arrow": KEY.U_ARROW,
+    "r_arrow": KEY.R_ARROW,
+    "d_arrow": KEY.D_ARROW,
+    "esc": KEY.ESC,
+    "escape": KEY.ESC,
+    "enter": KEY.ENTER,
+    "return": KEY.ENTER,
+    "backspace": KEY.BACKSPACE,
+    "spacebar": KEY.SPACEBAR,
+    "tab": KEY.TAB,
+    "shift": KEY.SHIFT,
+    "alt": KEY.ALT,
+    "capslock": KEY.CAPSLOCK,
+}
