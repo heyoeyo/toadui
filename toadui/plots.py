@@ -48,8 +48,6 @@ class SimpleHistogramPlot(CachedBgFgElement):
         use_bar_plot: bool = False,
         use_log_scale: bool = False,
         use_strict_ar: bool = False,
-        is_flexible_h: bool = True,
-        is_flexible_w: bool = True,
     ):
         """Bin centers should be either a numpy array or a tuple of the form:
             (start, end) or
@@ -105,7 +103,7 @@ class SimpleHistogramPlot(CachedBgFgElement):
         is_tall = self._w_over_h < 1
         min_h = round(min_side_length * self._h_over_w) if is_tall else min_side_length
         min_w = min_side_length if is_tall else round(min_side_length * self._w_over_h)
-        super().__init__(min_h, min_w, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
+        super().__init__(min_h, min_w, is_flexible_h=True, is_flexible_w=True)
 
     # .................................................................................................................
 
@@ -229,8 +227,7 @@ class SimpleHistogramPlot(CachedBgFgElement):
         return max(self._cb_rdr.min_h, round(w * self._h_over_w))
 
     def _get_dynamic_aspect_ratio(self):
-        is_flexible = self._cb_rdr.is_flexible_h and self._cb_rdr.is_flexible_w
-        return self._w_over_h if (self._has_ar and is_flexible) else None
+        return self._w_over_h
 
     def _rerender_bg(self, h: int, w: int) -> ndarray:
 

@@ -145,4 +145,4 @@ This demo allows the user to warp image or video data, interactively.
 
 This demo supports the use of input images or videos, including webcams! Warping is done using [complex numbers](https://en.wikipedia.org/wiki/Complex_number) and the [OpenCV remap function](https://docs.opencv.org/3.4/d1/da0/tutorial_remap.html) and can produce some funny, often bizarre imagery, especially when using rainbow coloring. If an input source isn't provided, a [truchet pattern](https://en.wikipedia.org/wiki/Truchet_tiles) will be used.
 
-**UI Elements:** VideoPlaybackSlider, TextCarousel, ImmediateButton, ToggleButton, Slider, StaticMessageBar
+**UI Elements:** VideoPlaybackSlider, TextCarousel, ImmediateButton, ToggleButton, Slider, MessageBar
