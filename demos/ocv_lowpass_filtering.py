@@ -16,12 +16,13 @@ from toadui.window import DisplayWindow, KEY
 from toadui.video import VideoPlaybackSlider, read_webcam_string, load_looping_video_or_image
 from toadui.images import FixedARImage
 from toadui.layout import VStack, HStack, Swapper
-from toadui.buttons import RadioBar, ToggleButton
+from toadui.buttons import RadioBar, ToggleButton, ImmediateButton
 from toadui.sliders import Slider
 from toadui.carousels import TextCarousel
 from toadui.text import PrefixedTextBlock
 from toadui.helpers.images import dirty_blur, kuwahara_filter
 from toadui.helpers.sizing import get_image_hw_for_max_side_length, resize_hw
+from toadui.helpers.pathing import modify_file_path, simplify_path
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -165,6 +166,9 @@ ui_layout = VStack(
     swap_filter_ctrls_ui,
 )
 
+# Create button to handle saving from keypress
+hidden_save_btn = ImmediateButton("Save")
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% *** Display loop ***
@@ -184,6 +188,7 @@ window.attach_keypress_callbacks(
             {"[": img_size_slider.decrement, "]": img_size_slider.increment} if show_imgsize_slider else None
         ),
         "Toggle original image": {KEY.TAB: hidden_show_orig_btn.toggle},
+        "Save result": {"s": hidden_save_btn.click},
     }
 ).report_keypress_descriptions()
 print("- Right click sliders to reset values")
@@ -312,5 +317,10 @@ with window.auto_close(vreader.release):
         if req_break:
             break
 
+        # Save filtered image
+        if hidden_save_btn.read():
+            save_path = modify_file_path(input_path, f"_{filter_key.lower()}", ".png")
+            cv2.imwrite(save_path, result)
+            print("", "Saved:", simplify_path(save_path, include_user_home=True), sep="\n")
         pass
     pass

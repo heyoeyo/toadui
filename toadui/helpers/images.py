@@ -16,6 +16,7 @@ import numpy as np
 from typing import Iterable
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, IMGSHAPE_HW, XYNORM, XYPX, XY1XY2PX
+from toadui.helpers.ocv_types import OCVInterp
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -171,6 +172,72 @@ def adjust_image_gamma(image_uint8: ndarray, gamma: float | Iterable[float] = 1.
     if gamma == 1:
         return image_uint8
     return np.round(255 * np.pow(image_uint8.astype(np.float32) * (1.0 / 255.0), gamma)).astype(np.uint8)
+
+
+def make_alpha_image_from_mask(
+    image_bgr: ndarray,
+    mask_image: ndarray,
+    mask_bgr_components: bool = True,
+    invert_mask: bool = False,
+    interpolation: OCVInterp = None,
+) -> ndarray:
+    """
+    Helper used to create an image with an alpha channel (e.g. transparency) from
+    a normal image + mask. The provided mask should either be boolean, float or uint8.
+    Notes:
+    - If a boolean mask is given, it will be converted to uint8 using: uint8(mask) * 255
+    - If a non-boolean/uint8 mask (e.g. float) is given is will be converted using: uint8(mask * 255)
+    - If a mask with more than 1 channel is given, only the first (e.g. 'red') channel will be used
+    - The input image can be given as grayscale, bgr or even bgra
+    - If the given image and mask are different sizes, the mask will be scaled to match
+      the size of the image using the provided 'interpolation'
+    - If 'mask_bgr_components' is True, then the bgr channels will have the mask applied,
+      this can reduce the resulting filesize considerably when saving as .png
+    - If 'invert_mask' is True, then bright areas of the mask will be made transparent
+
+    Returns:
+        image_bgra
+    """
+
+    # Make sure we have a uint8 mask
+    mask_uint8 = mask_image
+    if mask_image.dtype != np.uint8:
+        mask_uint8 = np.uint8(mask_image) * 255 if mask_image.dtype == np.bool else np.uint8(mask_image * 255)
+
+    # Make sure mask is single-channeled
+    mask_uint8 = mask_uint8[:, :, 0] if mask_uint8.ndim == 3 else mask_uint8
+    if mask_uint8.ndim != 2:
+        raise TypeError("Unable to handle mask input, expecting 2 or 3 dimensions: HxW or HxWxC")
+
+    # Make sure we're dealing with an image that has color channels
+    img_bgra = cv2.cvtColor(image_bgr, cv2.COLOR_GRAY2BGR) if image_bgr.ndim == 2 else image_bgr.copy()
+    if img_bgra.ndim != 3:
+        raise TypeError("Unable to handle image input, expecting 2 or 3 dimensions: HxW or HxWxC")
+
+    # Add an alpha channel to the image if it doesn't have one
+    if img_bgra.shape[2] == 3:
+        img_bgra = cv2.cvtColor(img_bgra, cv2.COLOR_BGR2BGRA)
+    if img_bgra.shape[2] != 4:
+        raise TypeError("Unable to handle image input, expecting BGR or BGRA image shape: HxWx3 or HxWx4")
+
+    # Scale mask to match image size
+    mask_h, mask_w = mask_uint8.shape[0:2]
+    img_h, img_w = image_bgr.shape[0:2]
+    if mask_h != img_h or mask_w != img_w:
+        mask_uint8 = cv2.resize(mask_uint8, (img_w, img_h), interpolation=interpolation)
+
+    # Flip mask bits to invert
+    if invert_mask:
+        mask_uint8 = cv2.bitwise_not(mask_uint8)
+
+    # Store mask as alpha channel
+    if mask_bgr_components:
+        img_bgra[:, :, 0] = cv2.bitwise_and(img_bgra[:, :, 0], mask_uint8)
+        img_bgra[:, :, 1] = cv2.bitwise_and(img_bgra[:, :, 1], mask_uint8)
+        img_bgra[:, :, 2] = cv2.bitwise_and(img_bgra[:, :, 2], mask_uint8)
+    img_bgra[:, :, 3] = mask_uint8
+
+    return img_bgra
 
 
 def make_horizontal_gradient_image(

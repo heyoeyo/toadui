@@ -13,13 +13,14 @@ import numpy as np
 from toadui.cli import ask_for_media_path
 from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string
 from toadui.window import DisplayWindow, KEY
-from toadui.buttons import ToggleButton, RadioBar
+from toadui.buttons import ToggleButton, ImmediateButton, RadioBar
 from toadui.sliders import MultiSlider
 from toadui.images import DynamicImage
 from toadui.plots import SimpleHistogramPlot
 from toadui.layout import VStack, HStack, GridStack, Swapper
 from toadui.colormaps import apply_colormap, make_colormap_from_keypoints
 from toadui.helpers.images import histogram_equalization
+from toadui.helpers.pathing import modify_file_path, simplify_path
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -244,6 +245,9 @@ ui_layout = VStack(
     HStack(ch3_thresh, heq3_btn, flex=slider_flex),
 )
 
+# Create button to handle saving from keypress
+hidden_save_btn = ImmediateButton("Save")
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% *** Display loop ***
@@ -267,6 +271,7 @@ window.attach_keypress_callbacks(
         "Toggle histogram bar plot": {
             "b": (ch1_histo_plot.toggle_bar_plot, ch2_histo_plot.toggle_bar_plot, ch3_histo_plot.toggle_bar_plot)
         },
+        "Save modified image": {"s": hidden_save_btn.click},
     }
 )
 window.report_keypress_descriptions()
@@ -342,5 +347,10 @@ with window.auto_close(vreader.release):
         if req_break:
             break
 
+        # Save display image (with potential colorspace modifications)
+        if hidden_save_btn.read():
+            save_path = modify_file_path(input_path, "_modified_cspace", ".png")
+            cv2.imwrite(save_path, bgr_frame)
+            print("", "Saved:", simplify_path(save_path, include_user_home=True), sep="\n")
         pass
     pass

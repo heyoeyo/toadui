@@ -18,14 +18,15 @@ from toadui.sliders import Slider
 from toadui.images import FixedARImage
 from toadui.text import PrefixedTextBlock
 from toadui.colormaps import apply_colormap
-from toadui.buttons import ToggleButton, ImmediateButton
+from toadui.buttons import RadioBar, ToggleButton, ImmediateButton
 from toadui.layout import VStack, HStack, OverlayStack
 from toadui.overlays import EditBoxOverlay, MousePaintOverlay
 from toadui.patterns.checker import CheckerPattern
 from toadui.helpers.drawing import draw_circle_norm, draw_normalized_polygon
 from toadui.helpers.sizing import resize_hw, get_image_hw_for_max_side_length
-from toadui.helpers.images import histogram_equalization, convert_xy_norm_to_px
+from toadui.helpers.images import histogram_equalization, convert_xy_norm_to_px, make_alpha_image_from_mask
 from toadui.helpers.data_management import ValueChangeTracker, UndoRedoList
+from toadui.helpers.pathing import save_path_counter, modify_file_path, simplify_path
 
 # For type hints
 from numpy import ndarray
@@ -201,8 +202,8 @@ olay_stack = OverlayStack(img_elem, box_olay, paint_img_olay)
 
 # Create top level elements
 undo_btn, redo_btn, clear_btn = ImmediateButton.many("Undo", "Redo", "Clear")
-use_paint_btn = ToggleButton("Paint", color_on=(60, 195, 30), text_color_on=255)
-show_binmask_btn = ToggleButton("Binary", color_on=(195, 100, 35), text_color_on=255)
+radio_tool = RadioBar("Box", "Paint", height=40, color_on=(50, 125, 30))
+show_binmask_btn = ToggleButton("Show Binary", color_on=(195, 100, 35), text_color_on=255)
 hidden_force_btn = ImmediateButton("Force Re-cut")
 
 # Create lower control elements
@@ -218,7 +219,7 @@ time_txt_block = PrefixedTextBlock("", suffix=" ms")
 show_playback_bar = not (is_image_source or is_webcam_source)
 ui_layout = VStack(
     HStack(undo_btn, redo_btn, clear_btn),
-    HStack(use_paint_btn, show_binmask_btn),
+    HStack(radio_tool, show_binmask_btn),
     HStack(olay_stack, paint_mask_olay),
     playback_slider if is_video_source else None,
     HStack(enable_box_btn, use_heq_btn, preview_btn),
@@ -231,6 +232,9 @@ paint_img_olay.style.color_left_paint = fg_hint_color
 paint_img_olay.style.color_right_paint = bg_hint_color
 paint_mask_olay.style.color_left_paint = fg_hint_color
 paint_mask_olay.style.color_right_paint = bg_hint_color
+
+# Create button to handle saving from keypress
+hidden_save_btn = ImmediateButton("Save")
 
 
 # ---------------------------------------------------------------------------------------------------------------------
@@ -247,7 +251,7 @@ window.attach_keypress_callbacks(
             {",": vreader.prev_frame, ".": vreader.next_frame} if is_video_source else None
         ),
         "Adjust brush size": {"[": brush_slider_slider.decrement, "]": brush_slider_slider.increment},
-        "Toggle box/paint control": {"t": use_paint_btn.toggle},
+        "Toggle box/paint tool": {"t": radio_tool.next},
         "Toggle binary view": {"y": show_binmask_btn.toggle},
         "Toggle use of box cut": {"i": enable_box_btn.toggle},
         "Toggle (internal) contrast boost": {"b": use_heq_btn.toggle},
@@ -256,6 +260,7 @@ window.attach_keypress_callbacks(
         "Redo paint": {"r": redo_btn.click},
         "Clear painting": {"c": clear_btn.click},
         "Re-roll box cut": {"f": hidden_force_btn.click},
+        "Save result": {"s": hidden_save_btn.click},
     }
 )
 
@@ -295,16 +300,17 @@ with window.auto_close(vreader.release):
         is_mask_trail_finished, mask_trail_xy, mask_trail_lmr = paint_mask_olay.read_trail()
 
         # Enable/disable overlays based on box vs. paint control
-        is_tool_changed, use_paint = use_paint_btn.read()
+        is_tool_changed, _, tool_label = radio_tool.read()
         if is_tool_changed:
-            box_olay.enable(not use_paint)
-            paint_img_olay.enable(use_paint).enable_render(use_paint)
+            is_tool_paint = tool_label == "Paint"
+            box_olay.enable(not is_tool_paint)
+            paint_img_olay.enable(is_tool_paint).enable_render(is_tool_paint)
 
         # Auto-switch to painting when disabling box cut (better user experience)
         if is_enable_box_changed:
             box_olay.enable_render(enable_box_cut)
             if not enable_box_cut:
-                use_paint_btn.toggle(True)
+                radio_tool.set_label("Paint")
 
         # Update image used for all processing
         scale_hw = get_image_hw_for_max_side_length(frame.shape, max_img_size)
@@ -385,5 +391,12 @@ with window.auto_close(vreader.release):
         if req_break:
             break
 
+        # Save grabcut result
+        if hidden_save_btn.read():
+            bin_mask = np.bitwise_or(out_mask == cv2.GC_PR_FGD, out_mask == cv2.GC_FGD)
+            alpha_img = make_alpha_image_from_mask(frame, bin_mask)
+            save_path = save_path_counter(modify_file_path(input_path, "_grabcut", ".png"), count_separator="_")
+            cv2.imwrite(save_path, alpha_img)
+            print("", "Saved:", simplify_path(save_path, include_user_home=True), sep="\n")
         pass
     pass
