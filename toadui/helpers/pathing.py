@@ -134,7 +134,7 @@ def simplify_path(
     has_home_path = False
     if include_user_home:
         user_home_path = os.path.expanduser("~")
-        new_path = path.replace(user_home_path, "~")
+        new_path = new_path.replace(user_home_path, "~")
         has_home_path = new_path != input_path
 
     # Remove middle path components, if needed
