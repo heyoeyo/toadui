@@ -13,7 +13,7 @@ from toadui.helpers.styling import UIStyle, get_background_thickness
 # For type hints
 from typing import NamedTuple
 from numpy import ndarray
-from toadui.helpers.types import XYPX, XYNORM, COLORU8
+from toadui.helpers.types import XYPX, XYNORM, COLORU8, SelfType
 from toadui.helpers.ocv_types import OCVFont, OCVLineType
 
 
@@ -263,7 +263,15 @@ class TextDrawer:
         w: float | None = None,
         example_text: str | None = None,
         allow_upscale: bool = False,
-    ) -> float:
+    ) -> SelfType:
+        """
+        Function used to adjust text scaling (of an existing instance)
+        such that the provided text fits within the provided height & width.
+
+        If no example text is provided the text: 'Testing' will be used.
+        If 'allow_upscale' is True, then the scaling is allowed to
+        scale upwards to fit into the provided height/width.
+        """
 
         # Sanity check
         targ_h, targ_w = h, w

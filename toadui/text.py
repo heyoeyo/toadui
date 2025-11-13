@@ -313,9 +313,8 @@ class MessageBar(BaseCallback):
             margin_xy_px=(12, 0) if not use_equal_width else (0, 0),
         )
 
-        # Inherit from parent & render initial image to cache results
+        # Inherit from parent
         super().__init__(height, total_msg_w, is_flexible_h=False, is_flexible_w=is_flexible_w)
-        self.render(height, total_msg_w)
 
     # .................................................................................................................
 
