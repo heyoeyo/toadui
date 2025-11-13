@@ -328,14 +328,7 @@ class VStack(BaseCallback):
             # Update stacking point for next child
             y_stack = y2 + bpad
 
-        out_img = np.vstack(imgs_list)
-        if len(self._cb_parent_list) == 0:
-            out_h, out_w = out_img.shape[0:2]
-            x1, y1 = self._cb_region.x1, self._cb_region.y1
-            x2, y2 = x1 + out_w, y1 + out_h
-            self._update_cb_region(x1, y1, x2, y2)
-
-        return out_img
+        return np.vstack(imgs_list)
 
     # .................................................................................................................
 
@@ -427,10 +420,10 @@ class GridStack(BaseCallback):
 
         # Inherit from parent
         super().__init__(128, 128)
-        self._append_cb_children(*items)
 
         # Fill in missing row/column counts
-        num_items = len(items)
+        self._items = tuple(items)
+        num_items = len(self._items)
         if num_rows is None and num_columns is None:
             num_rows, num_columns = self.get_row_column_by_aspect_ratio(num_items, target_aspect_ratio)
         elif num_rows is None:
@@ -442,7 +435,7 @@ class GridStack(BaseCallback):
 
         # Store ordering info
         self._is_row_ordered = is_row_ordered
-        self._layout: VStack | HStack = self._rebuild_layout()
+        self._layout: VStack | HStack = self._build_new_layout()
 
         # Set up element styling when having to pad child items
         self.style = UIStyle(
@@ -482,7 +475,7 @@ class GridStack(BaseCallback):
         # Update internal records
         self._num_rows = num_rows
         self._num_cols = num_cols
-        self._rebuild_layout()
+        self._layout = self._build_new_layout()
 
         return self
 
@@ -496,10 +489,19 @@ class GridStack(BaseCallback):
         """Flip number of rows & columns"""
         self._num_rows, self._num_cols = self._num_cols, self._num_rows
         self._is_row_ordered = not self._is_row_ordered
-        self._rebuild_layout()
+        self._layout = self._build_new_layout()
         return self
 
     # .................................................................................................................
+
+    def __len__(self) -> int:
+        return len(self._items)
+
+    def __iter__(self):
+        return iter(self._items)
+
+    def __getitem__(self, index: int) -> BaseCallback:
+        return self._items[index]
 
     def row_iter(self) -> tuple[int, tuple]:
         """
@@ -523,8 +525,6 @@ class GridStack(BaseCallback):
 
         return
 
-    # .................................................................................................................
-
     def column_iter(self) -> tuple[int, tuple]:
         """
         Iterator over items per column. Example:
@@ -537,7 +537,7 @@ class GridStack(BaseCallback):
                 pass
         """
 
-        num_items = len(self)
+        num_items = len(self._items)
         for col_idx in range(self._num_cols):
             item_idxs = [col_idx + row_idx * self._num_cols for row_idx in range(self._num_rows)]
             items_in_column = tuple(self[item_idx] for item_idx in item_idxs if item_idx < num_items)
@@ -546,8 +546,6 @@ class GridStack(BaseCallback):
             yield col_idx, items_in_column
 
         return
-
-    # .................................................................................................................
 
     def grid_iter(self) -> tuple[int, int, BaseCallback]:
         """
@@ -583,33 +581,46 @@ class GridStack(BaseCallback):
     def _get_width_given_height(self, h):
         return self._layout._get_width_given_height(h)
 
-    def _rebuild_layout(self) -> VStack | HStack:
+    def _update_cb_region(self, x1, y1, x2, y2) -> SelfType:
+        self._layout._update_cb_region(x1, y1, x2, y2)
+        self._cb_region = self._layout._cb_region
+        return
+
+    def _build_new_layout(self) -> VStack | HStack:
         """
         Helper used to re-build the internal V/HStack layout structure,
         needed when the number of rows or columns changes
         """
 
+        # Clear existing layout parent relationship from items (we're about to replace it)
+        try:
+            for item in self._items:
+                item._clear_cb_parent(self._layout)
+        except AttributeError:
+            # Expected to happen on first run, since there is no 'self._layout' built yet!
+            # -> This is ok to skip if we haven't set up a parent relationship on the items
+            pass
+
         # Set up parameters used to build layout for row-vs-column ordering
+        # - Default to stacking horizontally (axis) and then vertical (alt)
+        # - 'axis' refers to the main axis (i.e. items 0, 1, 2, etc. are stacked into first)
+        # - 'alt' refers to the alternate axis (i.e. stacks of [0, 1, 2], [4, 5, 6], etc.)
         axis_alt_count = (self._num_cols, self._num_rows)
         axis_alt_stack = (HStack, VStack)
-        axis_alt_sep = (HSeparator, HSeparator)
         if not self._is_row_ordered:
             axis_alt_count = tuple(reversed(axis_alt_count))
             axis_alt_stack = tuple(reversed(axis_alt_stack))
-            axis_alt_sep = tuple(reversed(axis_alt_sep))
 
         # Build vertical stack of rows (row-order) or horizontal stack of column (column-order) layout
         axis_count, alt_count = axis_alt_count
         axis_stack, alt_stack = axis_alt_stack
-        axis_sep, alt_sep = axis_alt_sep
         axis_stacks_list = []
         for axis_idx in range(alt_count):
             idx_offset = axis_idx * axis_count
             item_slice = slice(idx_offset, idx_offset + axis_count)
-            item_list = self[item_slice]
+            item_list = self._items[item_slice]
             axis_stacks_list.append(axis_stack(*item_list))
-        new_layout = alt_stack(*axis_stacks_list)
-        self._layout = new_layout
+        new_layout = alt_stack(*axis_stacks_list)  # This is: VStack(*[HStack, ...]) or HStack(*[VStack, ...])
 
         # Update sizing constraints
         min_h_list = [axis._cb_rdr.min_h for axis in new_layout]
@@ -620,7 +631,11 @@ class GridStack(BaseCallback):
         min_w = max(min_w_list) if self._is_row_ordered else sum(min_w_list)
         self._cb_rdr = CBRenderSizing(min_h, min_w, is_flex_h, is_flex_w)
 
-        return self._layout
+        # Use new layout as (only) child element
+        self._clear_cb_children()
+        self._append_cb_children(new_layout)
+
+        return new_layout
 
     # .................................................................................................................
 
@@ -819,33 +834,33 @@ class Swapper(BaseCallback):
         assert len(set(keys)) == num_keys, f"Cannot have duplicate keys: {keys}"
         assert num_keys == num_items, f"Number of keys ({num_keys}) must match number of swap items ({num_items})"
 
+        # Inherit from parent
+        initial_index = max(0, min(num_items - 1, initial_index))
+        item_rdr = items[initial_index]._cb_rdr
+        super().__init__(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
+
         # Store items for swapping
         self._is_changed = True
         self._items: tuple[BaseCallback] = items
-        self._swap_idx: int = initial_index
         self._num_items: int = len(self._items)
         self._key_to_idx_lut = {key: idx for idx, key in enumerate(keys)}
 
-        item_rdr = self._items[initial_index]._cb_rdr
-        super().__init__(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
-
-    # .................................................................................................................
-
-    def _update_render_sizing(self):
-        item_rdr = self._items[self._swap_idx]._cb_rdr
-        self._cb_rdr = CBRenderSizing(item_rdr.min_h, item_rdr.min_w, item_rdr.is_flexible_h, item_rdr.is_flexible_w)
-        return None
+        # Set up initial swap item
+        self._swap_idx: int = initial_index
+        self._active_item: BaseCallback = self._items[initial_index]
+        self._cb_rdr: CBRenderSizing = self._active_item._cb_rdr.copy()
+        self._append_cb_children(self._active_item)
 
     # .................................................................................................................
 
     def get_active_element(self) -> BaseCallback:
         """Helper used to access the currently active swap item (without reading or consuming 'is changed')"""
-        return self._items[self._swap_idx]
+        return self._active_item
 
     def read(self) -> tuple[bool, int, BaseCallback]:
         """Get a reference to the current swap element. Returns: is_changed, swap_index, swap_element"""
         is_changed, self._is_changed = self._is_changed, False
-        return is_changed, self._swap_idx, self._items[self._swap_idx]
+        return is_changed, self._swap_idx, self._active_item
 
     # .................................................................................................................
 
@@ -855,12 +870,31 @@ class Swapper(BaseCallback):
         Returns:
             current_swap_item
         """
-        if 0 <= swap_index < self._num_items:
-            if swap_index != self._swap_idx:
+
+        if swap_index < self._num_items:
+            # Handle negative indexing
+            if swap_index < 0:
+                swap_index = max(0, self._num_items - swap_index)
+
+            # Only update if index is actually different (don't want to trigger change event otherwise)
+            prev_idx = self._swap_idx
+            if swap_index != prev_idx:
+
+                # Clean up callback handling (want active element to seem like the only child callback)
+                # -> Also want to clear self as parent before re-appending child, so we don't have repeats!
+                self._clear_cb_children()
+                new_active_element = self._items[swap_index]
+                new_active_element._clear_cb_parent(self)
+                self._append_cb_children(new_active_element)
+
+                # Update internal state tracking
                 self._swap_idx = swap_index
-                self._update_render_sizing()
+                self._active_item = new_active_element
+                self._cb_rdr = self._active_item._cb_rdr.copy()
                 self._is_changed = True
-        return self._items[self._swap_idx]
+            pass
+
+        return self._active_item
 
     def set_swap_key(self, swap_key: Any) -> BaseCallback:
         """
@@ -882,30 +916,25 @@ class Swapper(BaseCallback):
 
     # .................................................................................................................
 
-    def _render_up_to_size(self, h, w):
-        parent = self._cb_region
-        item = self._items[self._swap_idx]
-        item._update_cb_region(parent.x1, parent.y1, parent.x2, parent.y2)
-        return item._render_up_to_size(h, w)
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+        return self._active_item._render_up_to_size(h, w)
 
     def _get_dynamic_aspect_ratio(self):
-        return self._items[self._swap_idx]._get_dynamic_aspect_ratio()
+        return self._active_item._get_dynamic_aspect_ratio()
 
     def _get_height_and_width_without_hint(self):
-        return self._items[self._swap_idx]._get_height_and_width_without_hint()
+        return self._active_item._get_height_and_width_without_hint()
 
     def _get_height_given_width(self, w):
-        return self._items[self._swap_idx]._get_height_given_width(w)
+        return self._active_item._get_height_given_width(w)
 
     def _get_width_given_height(self, h):
-        return self._items[self._swap_idx]._get_width_given_height(h)
+        return self._active_item._get_width_given_height(h)
 
-    def _cb_iter(self, global_x_px: int, global_y_px: int):
-        if not self._cb_state.disabled:
-            child = self._items[self._swap_idx]
-            if not child._cb_state.disabled:
-                yield from child._cb_iter(global_x_px, global_y_px)
-        return
+    def _update_cb_region(self, x1, y1, x2, y2) -> SelfType:
+        self._active_item._update_cb_region(x1, y1, x2, y2)
+        self._cb_region = self._active_item._cb_region
+        return self
 
     # .................................................................................................................
 

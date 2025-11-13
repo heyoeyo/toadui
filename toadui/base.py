@@ -140,11 +140,11 @@ class BaseCallback(CBChild):
         self._cb_state = CBState()
 
         # Storage for all child callback items
-        self._cb_parent_list: BaseCallback = []
-        self._cb_child_list: BaseCallback = []
+        self._cb_parent_list: list[BaseCallback] = []
+        self._cb_child_list: list[BaseCallback] = []
 
         # Storage for name that can be printed when debugging
-        self._debug_name = None
+        self._debug_name: str | None = None
 
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
@@ -193,6 +193,14 @@ class BaseCallback(CBChild):
         if len(self._cb_parent_list) > 0:
             is_correct_size = (frame.shape[0] == h) and (frame.shape[1] == w)
             assert is_correct_size, f"Bad render size: {tuple(frame.shape[0:2])} vs {(h, w)} ({self})"
+        else:
+            # Set the correct callback region sizing for the caller element
+            # (as called likely has no layout element to update it's sizing!)
+            img_h, img_w = frame.shape[0:2]
+            if img_h != self._cb_region.h or img_w != self._cb_region.w:
+                self._update_cb_region(0, 0, img_w, img_h)
+            pass
+        pass
 
         return frame
 
@@ -221,8 +229,50 @@ class BaseCallback(CBChild):
             # Sanity check. Make sure we're dealing with a callback item before storing
             assert isinstance(child, BaseCallback), f"Children must inherit from: BaseCallback, got: {type(child)}"
             self._cb_child_list.append(child)
-            child._cb_parent_list.append(self)
+            self._register_as_parent_of(child)
 
+        return self
+
+    def _register_as_parent_of(self, *child_items: CBChild) -> SelfType:
+        """
+        Used to record 'self' as a parent to the provided child element(s).
+        The primary purpose for this (at least so far) is to indicate to
+        child elements that they are 'nested' within other elements. This
+        is important, for example, for layout elements so that they do
+        not assume they are the 'outer-most' element when rendering.
+        """
+        for child in child_items:
+            assert self not in child._cb_parent_list, f"Error - {self} is already a parent of {child}"
+            child._cb_parent_list.append(self)
+        return self
+
+    def _clear_cb_children(self) -> SelfType:
+        """
+        Function used to clear existing child callbacks.
+        This has the potential to cause major problems with proper
+        handling of callbacks! Only use if absolutely neccessary.
+        """
+        self._cb_child_list: list[BaseCallback] = []
+        return self
+
+    def _clear_cb_parent(self, parent=None) -> SelfType:
+        """
+        Function used to clear an existing parent listing.
+        This should normally not be called, but may be useful
+        in cases where a different 'parent' element is being
+        substituted to take over child elements.
+
+        If 'None' is provided, then all parents will be
+        cleared (this is not recommended!), otherwise only
+        the provided parent will be cleared, and only if
+        it is in the parent listing
+
+        """
+        if parent is None:
+            self._cb_parent_list: list[BaseCallback] = []
+        elif parent in self._cb_parent_list:
+            parent_idx = self._cb_parent_list.index(parent)
+            self._cb_parent_list.pop(parent_idx)
         return self
 
     def __len__(self) -> int:
