@@ -706,13 +706,15 @@ class OverlayStack(BaseCallback):
         for olay in overlay_items:
             olay._cb_rdr = base_item._cb_rdr.copy()
             olay._cb_child_list.clear()
-        self._overlay_items = tuple(overlay_items)
 
-        # Store base & overlays for future reference and enable callbacks for children
+        # Store base item for re-use in rendering and attach as child if we want to pass callbacks to it
         self._base_item = base_item
         if not suppress_callbacks_to_base:
             self._append_cb_children(self._base_item)
-        self._append_cb_children(*overlay_items)
+
+        # Store initial overlays
+        self._overlay_items = tuple()
+        self.add_overlays(*overlay_items)
 
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
@@ -722,14 +724,28 @@ class OverlayStack(BaseCallback):
     # .................................................................................................................
 
     def add_overlays(self, *overlay_items: BaseOverlay) -> SelfType:
-        """Function used to add overlays (after init)"""
+        """Function used to add overlays"""
 
+        # Attach child overlays
+        # - Try to (forcefully) give them a copy of the base item (if they have existing storage for it)
+        # - This allows overlays to directly reference the base item from user code
+        # - This isn't needed for the overlay stack itself (just a QoL feature)
+        new_olay_items = tuple(overlay_items)
+        for olay_item in new_olay_items:
+            if hasattr(olay_item, "_base_item"):
+                olay_item._base_item = self._base_item
+            self._append_cb_children(olay_item)
+
+        # Update storage of overlays to include new items
         olays_list = list(self._overlay_items)
-        olays_list.extend(overlay_items)
+        olays_list.extend(new_olay_items)
         self._overlay_items = tuple(olays_list)
-        self._append_cb_children(*overlay_items)
 
         return self
+
+    def get_base_item(self) -> BaseCallback:
+        """Function used to get access to the underlying base element"""
+        return self._base_item
 
     # .................................................................................................................
 

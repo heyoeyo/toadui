@@ -480,9 +480,11 @@ class BaseOverlay(BaseCallback):
 
         A base_item of 'None' can be provided, but is only intended for a special use case!
         Specifically, if this overlay is part of a stack of overlays on a single base item,
-        then a 'None' value can be provided. The assumption being that, later, a parent
-        stack item will
+        then a 'None' value can be provided. The assumption being that, later, the parent
+        stack element will be responsible for handling the rendering and interaction of
+        all overlays elements (this is mainly for the sake of optimization).
         """
+
         super().__init__(1, 1)
         self._enable_overlay_render = True
         self._base_item = base_item
@@ -490,6 +492,7 @@ class BaseOverlay(BaseCallback):
             if not suppress_callbacks_to_base:
                 self._append_cb_children(self._base_item)
             self._cb_rdr = base_item._cb_rdr.copy()
+        pass
 
     def __repr__(self) -> str:
         cls_name = self.__class__.__name__
@@ -497,6 +500,16 @@ class BaseOverlay(BaseCallback):
 
     def _render_overlay(self, frame: ndarray) -> ndarray:
         raise NotImplementedError(f"Must implement '_render_overlay' function ({self})")
+
+    # .................................................................................................................
+
+    def get_base_item(self) -> BaseCallback | None:
+        """
+        Function used to get access to the underlying base element, if present.
+        Note that the base item may be set to 'None', usually when used in
+        an overlay stack (e.g. more than 1 overlay on top of a single item)!
+        """
+        return self._base_item
 
     # .................................................................................................................
 
