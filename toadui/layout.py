@@ -137,7 +137,7 @@ class HStack(BaseCallback):
             # Provide callback region to child item
             x1, y1 = x_stack + lpad, y_stack + tpad
             x2, y2 = x1 + frame_w, y1 + frame_h
-            child._cb_region.resize(x1, y1, x2, y2)
+            child._update_cb_region(x1, y1, x2, y2)
 
             # Update stacking point for next child
             x_stack = x2 + rpad
@@ -323,7 +323,7 @@ class VStack(BaseCallback):
             # Provide callback region to child item
             x1, y1 = x_stack + lpad, y_stack + tpad
             x2, y2 = x1 + frame_w, y1 + frame_h
-            child._cb_region.resize(x1, y1, x2, y2)
+            child._update_cb_region(x1, y1, x2, y2)
 
             # Update stacking point for next child
             y_stack = y2 + bpad
@@ -333,7 +333,7 @@ class VStack(BaseCallback):
             out_h, out_w = out_img.shape[0:2]
             x1, y1 = self._cb_region.x1, self._cb_region.y1
             x2, y2 = x1 + out_w, y1 + out_h
-            self._cb_region.resize(x1, y1, x2, y2)
+            self._update_cb_region(x1, y1, x2, y2)
 
         return out_img
 
@@ -744,9 +744,9 @@ class OverlayStack(BaseCallback):
         base_h, base_w = base_frame.shape[0:2]
 
         x2, y2 = x1 + base_w, y1 + base_h
-        self._base_item._cb_region.resize(x1, y1, x2, y2)
+        self._base_item._update_cb_region(x1, y1, x2, y2)
         for overlay in self._overlay_items:
-            overlay._cb_region.resize(x1, y1, x2, y2)
+            overlay._update_cb_region(x1, y1, x2, y2)
             base_frame = overlay._render_overlay(base_frame) if overlay._enable_overlay_render else base_frame
 
         return base_frame
@@ -869,7 +869,7 @@ class Swapper(BaseCallback):
     def _render_up_to_size(self, h, w):
         parent = self._cb_region
         item = self._items[self._swap_idx]
-        item._cb_region.resize(parent.x1, parent.y1, parent.x2, parent.y2)
+        item._update_cb_region(parent.x1, parent.y1, parent.x2, parent.y2)
         return item._render_up_to_size(h, w)
 
     def _get_dynamic_aspect_ratio(self):

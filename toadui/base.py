@@ -424,6 +424,37 @@ class BaseCallback(CBChild):
         """
         return None
 
+    def _update_cb_region(self, x1, y1, x2, y2) -> SelfType:
+        """
+        Function used to resize callback region (used to look for mouse events).
+        This is generally called by layout elements, which need to tell child elements
+        about changes to their positioning or size.
+
+        Note that position/sizing is often not known until *after* an element has rendered.
+        This can lead to errors in parent-child region sizing.
+        For example consider a sequence involving a top-most element 'T' which contains
+        a child element 'A' which itself contains a child 'B':
+            Assume Item A has initial region: (x1=0, y1=0, x2=400, y2=500)
+            1. Item T (top-most) asks item A (child of T) to render
+            2. Item A renders, during which item B (child of A) is asked to render.
+               Item B ends up having a height of 100 and width of 200
+            3. Item A asks item B to update region to (x1,y1,x1+200,y1+100)
+               where x1,y1 come from A's region, so B has region: (0,0,200,100)
+            4. Item T asks item A to update region to (100,100,900,800)
+
+        This last update, which offsets and scales the region of item A (e.g. x1=100, y1=100),
+        now means that item B has the wrong region because it was offset using the original
+        x1/y1 of item A which is now changed by the last update. This may be fixed on the
+        next render update, where item A will now pass the updated x1/y1 offsets to item B,
+        but if A is caching it's render results, this may not happen right away!
+
+        This function therefore can be overriden to resolve these situations. In this
+        case, item A would override it's resizing to also update item B, so that any
+        time the A region changes, it also updates the B region. This should only
+        be needed when creating elements that have tight parent-child sizing.
+        """
+        self._cb_region.resize(x1, y1, x2, y2)
+
     # .................................................................................................................
 
 
@@ -496,8 +527,8 @@ class BaseOverlay(BaseCallback):
         base_h, base_w = base_frame.shape[0:2]
 
         x2, y2 = x1 + base_w, y1 + base_h
-        self._base_item._cb_region.resize(x1, y1, x2, y2)
-        self._cb_region.resize(x1, y1, x2, y2)
+        self._base_item._update_cb_region(x1, y1, x2, y2)
+        self._update_cb_region(x1, y1, x2, y2)
 
         return self._render_overlay(base_frame) if self._enable_overlay_render else base_frame
 
