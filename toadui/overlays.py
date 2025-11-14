@@ -11,8 +11,9 @@ import cv2
 import numpy as np
 
 from toadui.base import BaseCallback, BaseOverlay, CBEventXY, CBEventFlags
+from toadui.helpers.colors import interpret_coloru8
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.drawing import draw_normalized_polygon, draw_circle_norm
+from toadui.helpers.drawing import draw_normalized_polygon, draw_circle_norm, draw_box_outline
 from toadui.helpers.text import TextDrawer
 
 # Typing
@@ -253,6 +254,66 @@ class DrawMaskOverlay(BaseOverlay):
 
         inv_frame = cv2.bitwise_and(frame, self._cached_inv_mask)
         return cv2.add(inv_frame, self._cached_mask_bgr)
+
+    # .................................................................................................................
+
+
+class DrawOutlineOverlay(BaseOverlay):
+    """
+    Simple overlay used to draw a box outline around the base element
+    Includes support for having a separate color when hovered.
+
+    Supports 'draw_in_place' option for greater efficiency.
+    This allows for drawing the outline directly onto base item, rather
+    than creating a copy of the image first. This is a destructive
+    modification, but can be disabled if needed.
+    """
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        base_item: BaseCallback,
+        color: COLORU8 | int = (0, 0, 0),
+        thickness_px: int = 1,
+        hover_color: COLORU8 | int | None = None,
+        hover_thickness_px: int | None = None,
+        draw_in_place: bool = True,
+    ):
+        # Inherit from parent
+        super().__init__(base_item)
+
+        # Storage for state
+        self._draw_in_place = draw_in_place
+        self._is_hovered = False
+
+        # Handle missing hover styling
+        if hover_color is None:
+            hover_color = color
+        if hover_thickness_px is None:
+            hover_thickness_px = thickness_px
+
+        # Set up element styling
+        self.style = UIStyle(
+            color=interpret_coloru8(color),
+            thickness=thickness_px,
+            hover_color=interpret_coloru8(hover_color),
+            hover_thickness=hover_thickness_px,
+        )
+
+    def _on_move(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
+        self._is_hovered = cbxy.is_in_region
+        return
+
+    def _render_overlay(self, frame: ndarray) -> ndarray:
+        if self._is_hovered:
+            color = self.style.hover_color
+            thickness = self.style.hover_thickness
+        else:
+            color = self.style.color
+            thickness = self.style.thickness
+        outframe = frame if self._draw_in_place else frame.copy()
+        return draw_box_outline(outframe, color, thickness)
 
     # .................................................................................................................
 
