@@ -17,7 +17,7 @@ from toadui.helpers.drawing import draw_normalized_polygon, draw_circle_norm, dr
 from toadui.helpers.text import TextDrawer
 
 # Typing
-from typing import NamedTuple
+from typing import NamedTuple, Callable
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, IMGSHAPE_HW, XYPX, XYNORM, HWPX, XY1XY2NORM, XY1XY2PX, SelfType, IsLMR
 from toadui.helpers.ocv_types import OCVInterp, OCVLineType, OCVFont
@@ -314,6 +314,71 @@ class DrawOutlineOverlay(BaseOverlay):
             thickness = self.style.thickness
         outframe = frame if self._draw_in_place else frame.copy()
         return draw_box_outline(outframe, color, thickness)
+
+    # .................................................................................................................
+
+
+class DrawCustomOverlay(BaseOverlay):
+    """
+    Overlay which allows for defining custom drawing logic
+
+    A custom drawing function must be provided which takes in
+    a numpy array (the underlying frame to draw on) and an
+    xy norm coordinate (0 to 1) corresponding to the most recent
+    mouse positioning. The function must return a numpy array
+    of the same size. For example:
+
+        def custom_blank_out_func(frame: ndarray, xy_norm: tuple[float, float]) -> ndarray:
+            return frame * 0
+
+    Alternatively, 'None' can be given, which will disable the overlay.
+
+    For cases where dynamic content is meant to be rendered, it is highly
+    recommended that the custom render function be implemented as a
+    method of a class. This will allow you to adjust parameters through
+    the class, which are then reflected in the render method, without
+    having to constantly re-assign a new render function. For example:
+
+        class DimmerOverlay:
+            def __init__(self, initial_dim: float = 0.5):
+                self._dim = initial_dim
+            def set_dim(self, dim:float) -> None:
+                self._dim = dim
+            def render(self, frame: ndarray, xy_norm: tuple[float, float]) -> ndarray:
+                return np.uint8(frame * self._dim)
+
+        # Assign dimmer render method as custom overlay
+        dimmer = DimmerOverlay(0.25)
+        custom_olay = DrawCustomOverlay(some_img_element, dimmer.render)
+        ... later ...
+        dimmer.set_dim(0.75) # <- this will affect the overlay at run-time
+    """
+
+    # .................................................................................................................
+
+    def __init__(self, base_item: BaseCallback, custom_render_function: Callable[[ndarray, XYNORM], ndarray] | None):
+        super().__init__(base_item)
+        self._xy_norm = (-1.0, -1.0)
+        self._custom_render_func: Callable[[ndarray, XYNORM], ndarray] | None = custom_render_function
+
+    def set_render_function(self, custom_render_function: Callable[[ndarray, XYNORM], ndarray] | None) -> SelfType:
+        """
+        Set a new overlay rendering function
+        This function is expected to take an image (numpy array) and mouse position
+        (xy_norm) as input and return an image (numpy array) of the same size, but
+        potentially with custom drawing done as an overlay.
+        """
+        self._custom_render_func = custom_render_function
+        return self
+
+    def _render_overlay(self, frame: ndarray) -> ndarray:
+        if self._custom_render_func is not None:
+            return self._custom_render_func(frame, self._xy_norm)
+        return frame
+
+    def _on_move(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
+        self._xy_norm = cbxy.xy_norm
+        return
 
     # .................................................................................................................
 

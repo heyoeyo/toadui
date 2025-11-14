@@ -33,6 +33,7 @@ from toadui.overlays import (
     DrawPolygonsOverlay,
     DrawMaskOverlay,
     DrawOutlineOverlay,
+    DrawCustomOverlay,
     TextOverlay,
     MousePaintOverlay,
     HoverLabelOverlay,
