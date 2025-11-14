@@ -1019,6 +1019,222 @@ class VSeparator(BaseCallback):
     # .................................................................................................................
 
 
+class Padded(BaseCallback):
+    """
+    Simple element used to add padding around another element
+    Padding can be provided as 4 numbers, 2 numbers or 1 number:
+        - If 4 numbers are given, interpret as: (x1, y1, x2, y2)
+        - If 2 numbers, interpret as: (x1 & x2, y1 & y2)
+          -> For example: (24, 0) gives 24px padding to left & right and 0 to top & bottom
+        - If 1 number is given, all sides get the same padding
+
+    Also supports adding labels to the top/bottom segments
+    """
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        base_item: BaseCallback,
+        pad_px: tuple[int, int, int, int] | tuple[int, int] | int = 8,
+        color: COLORU8 | int = (20, 20, 20),
+        top_label: str | None = None,
+        bottom_label: str | None = None,
+        inner_outline_color: COLORU8 | int | None = None,
+        outer_outline_color: COLORU8 | int | None = None,
+    ):
+        # Handle variety of ways of providing top/right/bottom/left inputs
+        if not isinstance(pad_px, Iterable):
+            pad_px = tuple(int(pad_px) for _ in range(4))
+        if len(pad_px) == 2:
+            x_pad, y_pad = pad_px
+            pad_px = (x_pad, y_pad, x_pad, y_pad)
+        assert len(pad_px) == 4, "Bad padding format! Must be given as 1, 2 or 4 integers"
+        pad_px = tuple(max(0, int(size)) for size in pad_px)
+
+        # Allocate storage for cached padding image components
+        pad_color = interpret_coloru8(color)
+        self._label_t = top_label
+        self._label_b = bottom_label
+        self._cache_t = blank_image(0, 0, pad_color)
+        self._cache_b = blank_image(0, 0, pad_color)
+        self._cache_l = blank_image(0, 0, pad_color)
+        self._cache_r = blank_image(0, 0, pad_color)
+        self._xy1xy2_pad_px = pad_px
+        self._cached_hw = (-1, -1)
+        self._base_item = base_item
+
+        # Set up element styling
+        lpad, tpad, rpad, bpad = pad_px
+        self.style = UIStyle(
+            color=pad_color,
+            text_top=TextDrawer(0.35, 1, pick_contrasting_gray_color(color), max_height=tpad),
+            text_bottom=TextDrawer(0.35, 1, pick_contrasting_gray_color(color), max_height=bpad),
+            top_label_xy_norm=(0.5, 0.5),
+            top_label_anchor_xy_norm=None,
+            top_label_offset_xy_px=(0, 0),
+            bottom_label_xy_norm=(0.5, 0.5),
+            bottom_label_anchor_xy_norm=None,
+            bottom_label_offset_xy_px=(0, 0),
+            color_inner_outline=interpret_coloru8(inner_outline_color),
+            color_outer_outline=interpret_coloru8(outer_outline_color),
+            thickness_inner_outline=1,
+            thickness_outer_outline=1,
+        )
+
+        # Inherit from parent
+        base_rdr = base_item._cb_rdr.copy()
+        min_h = base_rdr.min_h + tpad + bpad
+        min_w = base_rdr.min_h + rpad + lpad
+        is_flexible_h = base_rdr.is_flexible_h
+        is_flexible_w = base_rdr.is_flexible_w
+        super().__init__(min_h, min_w, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
+        self._append_cb_children(base_item)
+
+    # .................................................................................................................
+
+    def force_rerender(self) -> SelfType:
+        """Function used to force a re-render, which can be useful if altering styling parameters"""
+        self._cached_hw = (-1, -1)
+        return self
+
+    def set_labels(self, top_label: str | None = None, bottom_label: str | None = None) -> SelfType:
+        """
+        Function used to update top/bottom labels
+        - If 'None' is provided, the existing label will be kept as-is
+        - To clear a label, provide an empty string: ''
+        """
+
+        if top_label is not None:
+            top_label = str(top_label)
+            self._label_t = top_label if len(top_label) > 0 else None
+            self.force_rerender()
+
+        if bottom_label is not None:
+            bottom_label = str(bottom_label)
+            self._label_b = bottom_label if len(bottom_label) > 0 else None
+            self.force_rerender()
+
+        return self
+
+    # .................................................................................................................
+
+    def _render_up_to_size(self, h: int, w: int) -> ndarray:
+
+        # Render out the base image (with space left for padding)
+        lpad, tpad, rpad, bpad = self._xy1xy2_pad_px
+        tb_pad, lr_pad = tpad + bpad, lpad + rpad
+        target_base_h, target_base_w = max((h - tb_pad), 1), max((w - lr_pad), 1)
+        base_img = self._base_item._render_up_to_size(target_base_h, target_base_w)
+        base_h, base_w = base_img.shape[0:2]
+
+        cache_h, cache_w = self._cached_hw
+        if cache_h != cache_h or cache_w != base_w:
+            self._cached_hw = (base_h, base_w)
+            avail_tb_pad = max(h - base_h, 0)
+            avail_lr_pad = max(w - base_w, 0)
+
+            tfract = tpad / tb_pad if tb_pad > 0 else 0.5
+            actual_t_pad = round(avail_tb_pad * tfract)
+            actual_b_pad = avail_tb_pad - actual_t_pad
+
+            lfract = lpad / lr_pad if lr_pad > 0 else 0.5
+            actual_l_pad = round(avail_lr_pad * lfract)
+            actual_r_pad = avail_lr_pad - actual_l_pad
+
+            t_img = blank_image(actual_t_pad, w, self.style.color)
+            b_img = blank_image(actual_b_pad, w, self.style.color)
+            l_img = blank_image(base_h, actual_l_pad, self.style.color)
+            r_img = blank_image(base_h, actual_r_pad, self.style.color)
+
+            # Draw outlines (using filled rectangles to avoid rounded corners)
+            if self.style.color_inner_outline is not None:
+                ol_color, ol_thick = self.style.color_inner_outline, self.style.thickness_inner_outline
+                draw_rectfill = lambda img, xy1, xy2: cv2.rectangle(img, xy1, xy2, ol_color, -1, cv2.LINE_4)
+                x1, tb_x2 = actual_l_pad - ol_thick, w - actual_r_pad + ol_thick - 1
+                draw_rectfill(t_img, (x1, actual_t_pad - ol_thick), (tb_x2, actual_t_pad))
+                draw_rectfill(b_img, (actual_l_pad - ol_thick, 0), (tb_x2, ol_thick - 1))
+                draw_rectfill(l_img, (x1, 0), (actual_l_pad, base_h))
+                draw_rectfill(r_img, (0, 0), (ol_thick - 1, base_h))
+            if self.style.color_outer_outline is not None:
+                ol_color, ol_thick = self.style.color_outer_outline, self.style.thickness_outer_outline
+                draw_rectfill = lambda img, xy1, xy2: cv2.rectangle(img, xy1, xy2, ol_color, -1, cv2.LINE_4)
+                draw_rectfill(t_img, (0, 0), (w, ol_thick - 1))
+                draw_rectfill(b_img, (0, actual_b_pad - ol_thick), (w, actual_b_pad))
+                draw_rectfill(l_img, (0, 0), (ol_thick - 1, base_h))
+                draw_rectfill(r_img, (actual_r_pad - ol_thick, 0), (actual_r_pad, base_h))
+
+                # Draw 'left' edge that appears in the top/bottom segments
+                draw_rectfill(t_img, (0, 0), (ol_thick - 1, actual_t_pad))
+                draw_rectfill(b_img, (0, 0), (ol_thick - 1, actual_b_pad))
+
+                # Draw right edge that appears in the top/bottom segments
+                draw_rectfill(t_img, (w - ol_thick, 0), (w, actual_t_pad))
+                draw_rectfill(b_img, (w - ol_thick, 0), (w, actual_b_pad))
+
+            # Add labels to top/bottom segments if needed
+            if self._label_t is not None and actual_t_pad > 0:
+                t_xy_norm = self.style.top_label_xy_norm
+                t_anchor = self.style.top_label_xy_norm
+                t_offset = self.style.top_label_xy_norm
+                t_margin = (0, 0)
+                self.style.text_top.xy_norm(t_img, self._label_t, t_xy_norm, t_anchor, t_offset, t_margin)
+            if self._label_b is not None and actual_b_pad > 0:
+                b_xy_norm = self.style.bottom_label_xy_norm
+                b_anchor = self.style.bottom_label_xy_norm
+                b_offset = self.style.bottom_label_xy_norm
+                b_margin = (0, 0)
+                self.style.text_top.xy_norm(b_img, self._label_b, b_xy_norm, b_anchor, b_offset, b_margin)
+
+            # Record images so that we don't need to re-generate every frame
+            self._cache_t = t_img
+            self._cache_b = b_img
+            self._cache_l = l_img
+            self._cache_r = r_img
+
+            # Figure out size of new interaction region
+            base_x1, base_y1 = self._cb_region.x1 + actual_l_pad, self._cb_region.y1 + actual_t_pad
+            base_x2, base_y2 = base_x1 + base_w, base_y1 + base_h
+            self._base_item._update_cb_region(base_x1, base_y1, base_x2, base_y2)
+
+        out_img = np.hstack((self._cache_l, base_img, self._cache_r))
+        return np.vstack((self._cache_t, out_img, self._cache_b))
+
+    def _get_dynamic_aspect_ratio(self) -> SelfType:
+        return self._base_item._get_dynamic_aspect_ratio()
+
+    def _get_height_and_width_without_hint(self) -> HWPX:
+        return self._base_item._get_height_and_width_without_hint()
+
+    def _get_height_given_width(self, w: int) -> int:
+        return self._base_item._get_height_given_width(w)
+
+    def _get_width_given_height(self, h: int) -> int:
+        return self._base_item._get_width_given_height(h)
+
+    def _update_cb_region(self, x1, y1, x2, y2) -> SelfType:
+        """
+        Special override. This is needed to ensure the base item
+        gets the proper region sizing/offset in case the parent
+        (e.g. this class) has it's region updated after rendering,
+        as caching can prevent direct updates to base item region sizing!
+        """
+
+        # Update own region
+        self._cb_region.resize(x1, y1, x2, y2)
+
+        # Tell base item to update region accordingly
+        left_pad, top_pad = self._cache_l.shape[1], self._cache_t.shape[0]
+        base_h, base_w = self._base_item._cb_region.h, self._base_item._cb_region.w
+        base_x1, base_y1 = x1 + left_pad, y1 + top_pad
+        base_x2, base_y2 = base_x1 + base_w, base_y1 + base_h
+        self._base_item._update_cb_region(base_x1, base_y1, base_x2, base_y2)
+
+        return self
+
+    # .................................................................................................................
+
+
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Functions
 

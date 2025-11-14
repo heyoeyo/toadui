@@ -14,7 +14,7 @@ from toadui.cli import (
     select_from_options,
 )
 from toadui.images import DynamicImage, StretchImage, FixedARImage, ZoomImage
-from toadui.layout import HStack, VStack, GridStack, OverlayStack, Swapper, HSeparator, VSeparator
+from toadui.layout import HStack, VStack, GridStack, OverlayStack, Swapper, HSeparator, VSeparator, Padded
 from toadui.carousels import TextCarousel, PathCarousel
 from toadui.colormaps import ColormapsBar
 from toadui.sliders import Slider, MultiSlider, ColorSlider
