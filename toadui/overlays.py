@@ -11,13 +11,13 @@ import cv2
 import numpy as np
 
 from toadui.base import BaseCallback, BaseOverlay, CBEventXY, CBEventFlags
-from toadui.helpers.colors import interpret_coloru8
+from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.drawing import draw_normalized_polygon, draw_circle_norm, draw_box_outline
 from toadui.helpers.text import TextDrawer
 
 # Typing
-from typing import NamedTuple, Callable
+from typing import NamedTuple, Callable, Iterable
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, IMGSHAPE_HW, XYPX, XYNORM, HWPX, XY1XY2NORM, XY1XY2PX, SelfType, IsLMR
 from toadui.helpers.ocv_types import OCVInterp, OCVLineType, OCVFont
@@ -1460,5 +1460,278 @@ class EditBoxOverlay(BaseOverlay):
         cv2.rectangle(frame, xy1_px, xy2_px, self.style.color_fg, self.style.thickness_fg, cv2.LINE_4)
 
         return frame
+
+    # .................................................................................................................
+
+
+class GridSelectOverlay(BaseOverlay):
+    """
+    Overlay which allows for selecting tiles in a 'grid' layout over top of a base item.
+    Grid selection follows the mouse position and can be locked by left-clicking and
+    unlocked by right-clicking (or left-clicking the same point twice).
+    By default, the selected grid cell is outlined with a rectangle, though this
+    can be disabled by providing a color of 'None' or toggling visibility directly.
+
+    For example, a grid with only 2 rows and 2 columns would allow for selecting
+    quadrants of the underlying base item. Or, a grid with 1 row and 2 columns
+    would provide a simple way of selecting between the left & right halves of
+    the base item, etc.
+
+    Also provides basic support for displaying a text overlay (use .set_text_overlay)
+    next to the selected grid cell, meant for indicating values associated with cells.
+    """
+
+    # .................................................................................................................
+
+    def __init__(
+        self,
+        base_item: BaseCallback,
+        num_rows_columns: tuple[int, int] | int,
+        color: COLORU8 | int | None = (0, 255, 255),
+        thickness: int = 2,
+        color_bg: COLORU8 | int | None = (0, 0, 0),
+        initial_row_column_select: tuple[int, int] | None = None,
+    ):
+        # Interpret row/column count as tuple
+        if isinstance(num_rows_columns, int):
+            num_rows_columns = (num_rows_columns, num_rows_columns)
+        num_rows, num_cols = [max(size, 1) for size in num_rows_columns]
+
+        # Figure out initial setting
+        initial_rowcol = initial_row_column_select
+        if initial_rowcol is not None:
+            init_row, init_col = initial_row_column_select
+            init_row = max(0, min(num_rows - 1))
+            init_col = max(0, min(num_cols - 1))
+            initial_row_column_select = (init_row, init_col)
+
+        # Allocate storage for element state
+        self._num_rows = num_rows
+        self._num_cols = num_cols
+        self._selected_row_col: tuple[int, int] | None = initial_row_column_select
+        self._is_locked: bool = False
+        self._is_visible: bool = color is not None
+        self._is_changed: bool = True
+        self._text_str: str | None = None
+
+        # Set up element styling
+        color_fg = interpret_coloru8(color)
+        color_locked = pick_contrasting_gray_color(color_fg, contrast=0.5, color_lerp_weight=0.5)
+        self.style = UIStyle(
+            color_fg=color_fg,
+            color_bg=interpret_coloru8(color_bg),
+            color_locked=color_locked,
+            thickness_fg=thickness,
+            thickness_bg=max(1 + thickness, 2 * thickness) if thickness > 0 else 2,
+            text=TextDrawer(0.5, 2 if thickness > 2 else 1, (255, 255, 255), (0, 0, 0)),
+            text_margin_px=5,
+        )
+
+        # Inherit from parent
+        super().__init__(base_item)
+
+    # .................................................................................................................
+
+    def read(self) -> tuple[bool, bool, tuple[int, int] | None]:
+        """Returns: is_changed, is_locked, row_column_select"""
+        is_changed = self._is_changed
+        self._is_changed = False
+        return is_changed, self._is_locked, self._selected_row_col
+
+    def get_num_rows_columns(self) -> tuple[int, int]:
+        """Get the current number of rows & columns as a tuple"""
+        return (self._num_rows, self._num_cols)
+
+    def set_num_rows_columns(self, num_rows_columns: tuple[int, int] | int) -> SelfType:
+        """Update the number of rows and columns in the grid"""
+        if isinstance(num_rows_columns, int):
+            num_rows_columns = (num_rows_columns, num_rows_columns)
+        num_rows, num_cols = [max(size, 1) for size in num_rows_columns]
+
+        # Un-select row/column if it lies outside new grid
+        if self._selected_row_col is not None:
+            row_idx, col_idx = self._selected_row_col
+            is_outside_new_grid = (row_idx > (num_rows - 1)) or (col_idx > (num_cols - 1))
+            if is_outside_new_grid:
+                self._selected_row_col = None
+                self._is_changed = True
+
+        # Store new row/column counts
+        self._num_rows = num_rows
+        self._num_cols = num_cols
+
+        return self
+
+    def set_selected_row_column(
+        self,
+        selected_row_column: tuple[int, int] | None,
+        allow_wraparound: bool = True,
+        is_relative_move: bool = False,
+        ignore_lock: bool = False,
+    ) -> SelfType:
+        """
+        Programmatically change the selected row/column (i.e. instead of relying on mouse input)
+        If 'ignore_lock' is True, then the row/column can be adjusted even from the locked state
+        """
+
+        # Do nothing if locked
+        if self._is_locked and (not ignore_lock):
+            return self
+
+        # Handle special disabling case
+        if selected_row_column is None:
+            if self._selected_row_col != None:
+                self._selected_row_col = None
+                self._is_changed = True
+            return self
+
+        # Sanity check
+        assert isinstance(selected_row_column, Iterable), f"Must provide tuple (got: {selected_row_column})"
+        assert len(selected_row_column) == 2, "Error selecting row/column. Must provide (row, column) tuple or None"
+        row_idx, col_idx = selected_row_column
+
+        # Handle relatie movement
+        if is_relative_move and self._selected_row_col is not None:
+            curr_row_idx, curr_col_idx = self._selected_row_col
+            row_idx = curr_row_idx + row_idx
+            col_idx = curr_col_idx + col_idx
+
+        # Handle negative indexing
+        if row_idx < 0:
+            row_idx = self._num_rows + row_idx
+        if col_idx < 0:
+            col_idx = self._num_cols + col_idx
+
+        # Handle wraparound vs. clamping
+        if allow_wraparound:
+            row_idx = row_idx % self._num_rows
+            col_idx = col_idx % self._num_cols
+        else:
+            row_idx = max(0, min(row_idx, self._num_rows - 1))
+            col_idx = max(0, min(col_idx, self._num_cols - 1))
+
+        # Update row/column if it's different from current state
+        new_row_col = (row_idx, col_idx)
+        if new_row_col != self._selected_row_col:
+            self._selected_row_col = new_row_col
+            self._is_changed = True
+
+        return self
+
+    def set_text_overlay(self, text: str | None) -> SelfType:
+
+        # Only update text if not-None. If given empty string, disable text
+        if text is not None:
+            new_text = str(text)
+            self._text_str = new_text if len(new_text) > 0 else None
+
+        return self
+
+    # .................................................................................................................
+
+    def toggle_visibility(self, is_visible: bool | None = None) -> bool:
+        """Toggle visibilty (or set to True/False if given an input). Returns: is_visible"""
+        self._is_visible = not self._is_visible if is_visible is None else is_visible
+        return self._is_visible
+
+    def toggle_lock(self, is_locked: bool | None = None) -> bool:
+        """Toggle lock state (or set to True/False if given an input). Returns: is_locked"""
+        self._is_locked = not self._is_locked if is_locked is None else is_locked
+        return self._is_locked
+
+    # .................................................................................................................
+
+    def _on_move(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
+
+        # Locking stops movement
+        if self._is_locked:
+            return
+
+        # Flag changes to the selected grid cell
+        new_row_col = self._get_new_rowcol_index(cbxy)
+        is_changed = new_row_col != self._selected_row_col
+        if is_changed:
+            self._selected_row_col = new_row_col
+            self._is_changed = True
+
+        return
+
+    def _on_left_click(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
+
+        # Lock to clicked cell, unless clicking the same (already locked) cell, then unlock
+        new_row_col = self._get_new_rowcol_index(cbxy)
+        is_changed = new_row_col != self._selected_row_col
+        if is_changed:
+            self._selected_row_col = new_row_col
+            self._is_locked = True
+            self._is_changed = True
+        else:
+            # Toggle lock state when clicking on the same grid cell
+            self._is_locked = not self._is_locked
+        return
+
+    def _on_right_click(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
+        # Unlock on right click
+        if self._is_locked:
+            self._is_locked = False
+            self._on_move(cbxy, cbflags)
+        return
+
+    # .................................................................................................................
+
+    def _render_overlay(self, frame: ndarray) -> ndarray:
+
+        # Skip drawing overlay if invisible or nothing is selected
+        if not self._is_visible or self._selected_row_col is None or self.style.color_fg is None:
+            return frame
+
+        # Figure out grid cell bounds
+        frame_h, frame_w = frame.shape[0:2]
+        cell_w = (frame_w - 1) / self._num_cols
+        cell_h = (frame_h - 1) / self._num_rows
+        row_idx, col_idx = self._selected_row_col
+        x1, x2 = round(col_idx * cell_w), round((col_idx + 1) * cell_w)
+        y1, y2 = round(row_idx * cell_h), round((row_idx + 1) * cell_h)
+
+        # Draw rectangle to indicate grid cell
+        bg_color = self.style.color_bg
+        fg_color = self.style.color_locked if self._is_locked else self.style.color_fg
+        outframe = frame.copy()
+        if bg_color is not None:
+            cv2.rectangle(outframe, (x1, y1), (x2, y2), bg_color, self.style.thickness_bg, cv2.LINE_4)
+        cv2.rectangle(outframe, (x1, y1), (x2, y2), fg_color, self.style.thickness_fg, cv2.LINE_4)
+
+        # Draw text overlay, if present
+        if self._text_str is not None:
+            txt_h, txt_w, txt_base = self.style.text.get_text_size(self._text_str)
+            margin = self.style.text_margin_px
+
+            # Draw text 'x-centered' with selected grid cell (with clipping on left/right bounds)
+            txt_half_w, txt_half_h = txt_w * 0.5, txt_h * 0.5
+            x_px = (x1 + x2) * 0.5 - txt_half_w
+            x_px = min(max(x_px, margin), frame_w - (1 + txt_w + margin))
+
+            # Prefer to draw text above selected cell, unless selection is too close to the top of the frame
+            # -> Drawing below cell tends to be obstructed by the mouse!
+            y_px = y1 - txt_half_h - margin
+            if y_px < txt_half_h:
+                y_px = y2 + txt_h + margin
+
+            # Draw text pixel position directly to ensure proper bounding
+            self.style.text.xy_px(outframe, self._text_str, (round(x_px), round(y_px)))
+
+        return outframe
+
+    # .................................................................................................................
+
+    def _get_new_rowcol_index(self, cbxy: CBEventXY) -> tuple[int, int] | None:
+        """Helper used to get a grid row/column index from a mouse xy event"""
+        new_xy_index = None
+        if cbxy.is_in_region:
+            x_norm, y_norm = cbxy.xy_norm
+            row_idx = max(0, min(self._num_rows - 1, int(y_norm * self._num_rows)))
+            col_idx = max(0, min(self._num_cols - 1, int(x_norm * self._num_cols)))
+            new_xy_index = (row_idx, col_idx)
+        return new_xy_index
 
     # .................................................................................................................

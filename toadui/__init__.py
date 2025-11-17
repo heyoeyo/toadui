@@ -40,6 +40,7 @@ from toadui.overlays import (
     PointClickOverlay,
     BoxSelectOverlay,
     EditBoxOverlay,
+    GridSelectOverlay,
 )
 
 __version__ = "0.1alpha"
