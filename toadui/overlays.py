@@ -711,7 +711,7 @@ class HoverLabelOverlay(BaseOverlay):
         self._is_in_region = False
 
         self.style = UIStyle(
-            text=TextDrawer(scale, color=color, bg_color=bg_color),
+            text=TextDrawer(scale, thickness, color, bg_color),
             idle_timeout_ms=idle_timeout_ms,
         )
         self._xy_norm = xy_norm
