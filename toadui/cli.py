@@ -5,6 +5,7 @@
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Imports
 
+import __main__
 import os.path as osp
 from pathlib import Path
 from time import sleep
@@ -47,7 +48,8 @@ class HistoryJSON:
 
         # Set up history save file pathing
         if save_folder is None:
-            save_folder = __file__
+            # Try to save in the same folder as the running script, otherwise using the working directory
+            save_folder = Path.cwd() if not hasattr(__main__, "__file__") else osp.dirname(__main__.__file__)
         save_folder = Path(save_folder)
         save_folder = save_folder.expanduser()
         save_folder = save_folder.parent if save_folder.is_file() else save_folder

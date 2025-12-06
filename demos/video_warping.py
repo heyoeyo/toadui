@@ -10,6 +10,7 @@ import argparse
 import cv2
 import numpy as np
 
+from toadui.cli import ask_for_media_path
 from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string
 from toadui.window import DisplayWindow, KEY
 from toadui.buttons import ImmediateButton, ToggleButton
@@ -38,30 +39,35 @@ default_display_size = 900
 parser = argparse.ArgumentParser(description="Demo of manipulating a video or image data interactively")
 parser.add_argument("-i", "--input_path", default=default_input_path, type=str, help="Path to video or image")
 parser.add_argument("-d", "--display_size", default=default_display_size, type=int, help="Initial window size")
-parser.add_argument("-s", "--smith_tiles", action="store_true", help="Use smith tiles (when no input provided)")
-parser.add_argument("-g", "--grid", action="store_true", help="Use a grid image (when no input provided)")
+parser.add_argument("-t", "--truchet", action="store_true", help="Use truchet pattern instead of video")
+parser.add_argument("-s", "--smith", action="store_true", help="Use smith truchet tiles instead of video")
+parser.add_argument("-g", "--grid", action="store_true", help="Use a grid image (easier to understand warping)")
 parser.add_argument("-cam", "--use_webcam", action="store_true", help="Use webcam as video source")
 
 # For convenience
 args = parser.parse_args()
 input_path = args.input_path if not args.use_webcam else "cam"
 display_size = args.display_size
-use_smith_tiles = args.smith_tiles
+use_truchet_tiles = args.truchet
+use_smith_tiles = args.smith
 use_grid_image = args.grid
-
-# Handle webcam inputs
-is_webcam_source, input_path = read_webcam_string(input_path)
 
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Setup input source
 
-# Generate a static image if we're not given an input source
-if input_path is None:
+# Determine whether we're loading an input or generating a pattern
+is_webcam_source = False
+use_pattern_input = use_truchet_tiles or use_smith_tiles or use_grid_image
+if use_pattern_input:
 
+    # Generate a static image if we're not given an input source
     tile_side, tile_count, tile_thick_pct, tile_fg_color = 80, 10, 0.5, (127, 127, 127)
     total_side = tile_count * tile_side
-    if use_smith_tiles:
+    if use_truchet_tiles:
+        tiles_set = truchet.make_truchet_tiles_diagonal(tile_side, tile_thick_pct, tile_fg_color)
+        static_image = truchet.draw_truchet(total_side, tiles_set)
+    elif use_smith_tiles:
         tiles_set = truchet.make_truchet_tiles_smith(tile_side, tile_thick_pct, tile_fg_color)
         static_image = truchet.draw_truchet(total_side, tiles_set)
     elif use_grid_image:
@@ -69,11 +75,16 @@ if input_path is None:
         grid_thick = max(1, round(tile_side * tile_thick_pct * 0.5))
         static_image = draw_grid(grid_side, tile_count, tile_fg_color, grid_thick, use_wraparound_sampling=True)
     else:
-        tiles_set = truchet.make_truchet_tiles_diagonal(tile_side, tile_thick_pct, tile_fg_color)
-        static_image = truchet.draw_truchet(total_side, tiles_set)
+        print(use_truchet_tiles, use_smith_tiles, use_grid_image)
+        raise TypeError("Unexpected pattern selection!")
 
     # Use image as input 'path' (reader will properly interpret this)
     input_path = static_image
+
+else:
+    # Handle webcam inputs
+    input_path = ask_for_media_path(input_path)
+    is_webcam_source, input_path = read_webcam_string(input_path)
 
 # Set up 'video reader' for UI visualization, so we can work with continuous stream of 'frames'
 # (this works even for static images, they're treated as a video with 1 frame repeating)
