@@ -482,12 +482,13 @@ class MousePaintOverlay(BaseOverlay):
     def __init__(
         self,
         base_item: BaseCallback,
+        color: COLORU8 | int = (0, 255, 255),
+        brush_radius_norm: float = 0.1,
         enable_hover_indicator: bool = True,
         enable_render: bool = True,
         allow_left_click: bool = True,
         allow_middle_click: bool = False,
         allow_right_click: bool = False,
-        brush_radius_norm=0.1,
     ):
 
         # Allocate storage for mouse press/change state for left/middle/right click
@@ -507,12 +508,13 @@ class MousePaintOverlay(BaseOverlay):
         self.enable_render(enable_render)
 
         # Configure styling of overlay graphics
+        left_color = interpret_coloru8(color)
         self.style = UIStyle(
-            color_left_paint=(0, 255, 255),
+            color_left_paint=left_color,
             color_right_paint=(0, 0, 255),
             color_middle_paint=(255, 0, 255),
-            color_hover_fg=(0, 255, 255),
-            color_hover_bg=(0, 115, 115),
+            color_hover_fg=left_color,
+            color_hover_bg=pick_contrasting_gray_color(left_color, color_lerp_weight=0.45),
             thickness_hover_fg=1,
             thickness_hover_bg=2,
             hover_line_type=cv2.LINE_AA,
@@ -1491,6 +1493,7 @@ class GridSelectOverlay(BaseOverlay):
         thickness: int = 2,
         color_bg: COLORU8 | int | None = (0, 0, 0),
         initial_row_column_select: tuple[int, int] | None = None,
+        lock_on_click: bool = True,
     ):
         # Interpret row/column count as tuple
         if isinstance(num_rows_columns, int):
@@ -1513,6 +1516,7 @@ class GridSelectOverlay(BaseOverlay):
         self._is_visible: bool = color is not None
         self._is_changed: bool = True
         self._text_str: str | None = None
+        self._lock_on_click: bool = lock_on_click
 
         # Set up element styling
         color_fg = interpret_coloru8(color)
@@ -1663,11 +1667,12 @@ class GridSelectOverlay(BaseOverlay):
         is_changed = new_row_col != self._selected_row_col
         if is_changed:
             self._selected_row_col = new_row_col
-            self._is_locked = True
+            self._is_locked = self._lock_on_click
             self._is_changed = True
         else:
             # Toggle lock state when clicking on the same grid cell
-            self._is_locked = not self._is_locked
+            if self._lock_on_click:
+                self._is_locked = not self._is_locked
         return
 
     def _on_right_click(self, cbxy: CBEventXY, cbflags: CBEventFlags) -> None:
