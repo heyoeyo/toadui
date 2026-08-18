@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from toadui.base import BaseCallback
-from toadui.helpers.text import TextDrawer
+from toadui.helpers.text import TextDrawer, TXTSIZE
 from toadui.helpers.images import blank_image
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
@@ -19,7 +19,6 @@ from typing import Iterable, Any
 from numpy import ndarray
 from toadui.base import BaseOverlay, CBRenderSizing
 from toadui.helpers.types import SelfType, HWPX, COLORU8
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -956,7 +955,7 @@ class HSeparator(BaseCallback):
         self._label = label
         self.style = UIStyle(
             color=interpret_coloru8(color),
-            text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
+            text=None if label is None else TextDrawer(TXTSIZE.small, 1, pick_contrasting_gray_color(color)),
         )
         super().__init__(1, width, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
 
@@ -996,7 +995,7 @@ class VSeparator(BaseCallback):
         self._label = label
         self.style = UIStyle(
             color=interpret_coloru8(color),
-            text=None if label is None else TextDrawer(0.35, 1, pick_contrasting_gray_color(color)),
+            text=None if label is None else TextDrawer(TXTSIZE.small, 1, pick_contrasting_gray_color(color)),
         )
         super().__init__(height, 1, is_flexible_h=is_flexible_h, is_flexible_w=is_flexible_w)
 
@@ -1068,8 +1067,8 @@ class Padded(BaseCallback):
         lpad, tpad, rpad, bpad = pad_px
         self.style = UIStyle(
             color=pad_color,
-            text_top=TextDrawer(0.35, 1, pick_contrasting_gray_color(color), max_height=tpad),
-            text_bottom=TextDrawer(0.35, 1, pick_contrasting_gray_color(color), max_height=bpad),
+            text_top=TextDrawer(TXTSIZE.small, 1, pick_contrasting_gray_color(color), max_height=tpad),
+            text_bottom=TextDrawer(TXTSIZE.small, 1, pick_contrasting_gray_color(color), max_height=bpad),
             top_label_xy_norm=(0.5, 0.5),
             top_label_anchor_xy_norm=None,
             top_label_offset_xy_px=(0, 0),

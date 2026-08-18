@@ -7,7 +7,7 @@
 
 from toadui.base import BaseCallback, CachedBgFgElement
 from toadui.helpers.styling import UIStyle
-from toadui.helpers.text import TextDrawer, find_minimum_text_width
+from toadui.helpers.text import TextDrawer, TXTSIZE, find_minimum_text_width
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline
 from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
@@ -15,7 +15,6 @@ from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 # For type hints
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -30,7 +29,7 @@ class TextBlock(CachedBgFgElement):
         self,
         text: str = "",
         color: COLORU8 | int = (30, 25, 25),
-        text_scale: float = 0.35,
+        text_scale: float = TXTSIZE.small,
         max_characters: int = 8,
         height: int = 40,
         is_flexible_w: bool = True,
@@ -106,7 +105,7 @@ class PrefixedTextBlock(TextBlock):
         initial_value: str = "-",
         suffix: str = "",
         color: COLORU8 | int = (30, 25, 25),
-        text_scale: float = 0.35,
+        text_scale: float = TXTSIZE.small,
         max_characters: int | str = 8,
         height: int = 40,
         is_flexible_w: bool = True,
@@ -167,8 +166,8 @@ class TwoLineTextBlock(CachedBgFgElement):
         color_l1: COLORU8 | int = (160, 160, 160),
         color_l2: COLORU8 | int = (255, 255, 255),
         color_bg: COLORU8 | int = (64, 53, 52),
-        l1_text_scale: float = 0.35,
-        l2_text_scale: float = 0.35,
+        l1_text_scale: float = TXTSIZE.small,
+        l2_text_scale: float = TXTSIZE.small,
         height: int = 50,
         minimum_width: int | None = None,
         is_flexible_w: bool = True,
@@ -271,7 +270,7 @@ class MessageBar(BaseCallback):
     def __init__(
         self,
         *messages: str,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         color: COLORU8 | int = (150, 110, 15),
         height: int = 40,
         use_equal_width: bool = False,

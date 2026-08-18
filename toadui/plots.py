@@ -14,13 +14,12 @@ from toadui.helpers.sizing import get_image_hw_to_fit_by_ar
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 from toadui.helpers.drawing import draw_box_outline
-from toadui.helpers.text import TextDrawer
+from toadui.helpers.text import TextDrawer, TXTSIZE
 
 # For type hints
 from typing import Iterable
 from numpy import ndarray
 from toadui.helpers.types import SelfType, COLORU8
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -87,8 +86,8 @@ class SimpleHistogramPlot(CachedBgFgElement):
         color_axis = pick_contrasting_gray_color(color_bg)
         color_line = interpret_coloru8(color_line)
         self.style = UIStyle(
-            label_text=TextDrawer(scale=0.35, color=(180, 180, 180), max_height=self._label_margin_px),
-            title_text=TextDrawer(scale=0.5, color=(255, 255, 255), max_height=self._title_margin_px),
+            label_text=TextDrawer(scale=TXTSIZE.small, color=(180, 180, 180), max_height=self._label_margin_px),
+            title_text=TextDrawer(scale=TXTSIZE.medium, color=(255, 255, 255), max_height=self._title_margin_px),
             color_bg=color_bg,
             color_plot=color_bg,
             color_line=color_line,

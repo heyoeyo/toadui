@@ -9,7 +9,7 @@ import cv2
 import numpy as np
 
 from toadui.base import BaseCallback, CachedBgFgElement
-from toadui.helpers.text import TextDrawer
+from toadui.helpers.text import TextDrawer, TXTSIZE
 from toadui.helpers.images import blank_image, pad_image_to_hw
 from toadui.helpers.drawing import draw_box_outline, draw_drop_shadow, draw_rectangle_norm
 from toadui.helpers.colors import interpret_coloru8, adjust_as_hsv, pick_contrasting_gray_color, lerp_colors
@@ -20,7 +20,6 @@ from toadui.helpers.sizing import get_image_hw_to_fit_region, resize_hw
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType, HWPairPX
 from toadui.helpers.ocv_types import OCVInterp
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -39,7 +38,7 @@ class ToggleButton(BaseCallback):
         text_color_on: COLORU8 | int | None = None,
         text_color_off: COLORU8 | int | None = None,
         height: int = 40,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         is_flexible_w: bool = True,
     ):
 
@@ -346,7 +345,7 @@ class ImmediateButton(BaseCallback):
         color: COLORU8 | int = (100, 80, 90),
         text_color: COLORU8 | int | None = None,
         height: int = 40,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         is_flexible_w: bool = True,
     ):
 
@@ -690,7 +689,7 @@ class RadioBar(CachedBgFgElement):
         active_index: int = 0,
         color_on: COLORU8 | int = (95, 90, 75),
         color_off: COLORU8 | int | None = None,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         proportional_sizing: bool = False,
         label_padding: int = 2,
         height: int = 60,

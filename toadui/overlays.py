@@ -14,14 +14,13 @@ from toadui.base import BaseCallback, BaseOverlay, CBEventXY, CBEventFlags
 from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.drawing import draw_normalized_polygon, draw_circle_norm, draw_box_outline
-from toadui.helpers.text import TextDrawer
+from toadui.helpers.text import TextDrawer, TXTSIZE, TXTDEFAULTS
 
 # Typing
 from typing import NamedTuple, Callable, Iterable
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, IMGSHAPE_HW, XYPX, XYNORM, HWPX, XY1XY2NORM, XY1XY2PX, SelfType, IsLMR
 from toadui.helpers.ocv_types import OCVInterp, OCVLineType, OCVFont
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Types
@@ -392,12 +391,12 @@ class TextOverlay(BaseOverlay):
         self,
         base_item: BaseCallback,
         xy_norm: XYNORM = (0.5, 0.5),
-        scale: float = 0.5,
-        thickness: int = 1,
-        color: COLORU8 = (255, 255, 255),
+        scale: float = TXTSIZE.medium,
+        thickness: int = TXTDEFAULTS.thickness,
+        color: COLORU8 = TXTDEFAULTS.color,
         bg_color: COLORU8 = (0, 0, 0),
         font: OCVFont = cv2.FONT_HERSHEY_SIMPLEX,
-        line_type: OCVLineType = cv2.LINE_AA,
+        line_type: OCVLineType = TXTDEFAULTS.line_type,
         anchor_xy_norm: XYNORM | None = None,
         offset_xy_px: XYPX = (0, 0),
         margin_xy_px: XYPX = (5, 5),
@@ -698,9 +697,9 @@ class HoverLabelOverlay(BaseOverlay):
         label: str = "Hover Label",
         idle_timeout_ms: int = 750,
         xy_norm: XYNORM = (0.5, 0),
-        scale: float = 0.35,
-        thickness: int = 1,
-        color: COLORU8 = (255, 255, 255),
+        scale: float = TXTSIZE.small,
+        thickness: int = TXTDEFAULTS.thickness,
+        color: COLORU8 = TXTDEFAULTS.color,
         bg_color: COLORU8 = (0, 0, 0),
         anchor_xy_norm: XYNORM | None = None,
         offset_xy_px: XYPX = (0, 0),
@@ -1527,7 +1526,7 @@ class GridSelectOverlay(BaseOverlay):
             color_locked=color_locked,
             thickness_fg=thickness,
             thickness_bg=max(1 + thickness, 2 * thickness) if thickness > 0 else 2,
-            text=TextDrawer(0.5, 2 if thickness > 2 else 1, (255, 255, 255), (0, 0, 0)),
+            text=TextDrawer(TXTSIZE.medium, 2 if thickness > 2 else 1, TXTDEFAULTS.color, (0, 0, 0)),
             text_margin_px=5,
         )
 

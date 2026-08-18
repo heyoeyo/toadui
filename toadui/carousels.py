@@ -10,7 +10,7 @@ from pathlib import Path
 import numpy as np
 
 from toadui.base import CachedBgFgElement
-from toadui.text import TextDrawer
+from toadui.text import TextDrawer, TXTSIZE
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline, draw_normalized_polygon
 from toadui.helpers.styling import UIStyle
@@ -20,7 +20,6 @@ from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color
 from typing import Any, Iterable, Callable
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -47,7 +46,7 @@ class TextCarousel(CachedBgFgElement):
         color: COLORU8 | int = (60, 60, 60),
         height: int = 40,
         minimum_width: int = 128,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         center_deadspace: float = 0.05,
     ):
 
@@ -383,7 +382,7 @@ class PathCarousel(TextCarousel):
         color: COLORU8 | int = (60, 60, 60),
         height: int = 40,
         minimum_width: int = 128,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         center_deadspace: float = 0.05,
         sort_by_name: bool = True,
         sort_key: Callable | None = None,

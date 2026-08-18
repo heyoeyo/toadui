@@ -16,12 +16,49 @@ from numpy import ndarray
 from toadui.helpers.types import XYPX, XYNORM, COLORU8, SelfType
 from toadui.helpers.ocv_types import OCVFont, OCVLineType
 
+# ---------------------------------------------------------------------------------------------------------------------
+# %% Defaults
+
+# Use different defaults for OpenCV v5, which uses different font sizing
+IS_OCV_V5 = str(cv2.__version__).startswith("5")
+if IS_OCV_V5:
+
+    class _TextSizeSettings(NamedTuple):
+        extra_small: float = 0.35
+        small: float = 0.45
+        medium: float = 0.6
+        large: float = 0.85
+        extra_large: float = 1.1
+
+else:
+
+    class _TextSizeSettings(NamedTuple):
+        extra_small: float = 0.25
+        small: float = 0.35
+        medium: float = 0.5
+        large: float = 0.75
+        extra_large: float = 1.0
+
+
+class _DefaultText(NamedTuple):
+    font: OCVFont = cv2.FONT_HERSHEY_SIMPLEX
+    scale: float = _TextSizeSettings.medium
+    thickness: int = 1
+    color: COLORU8 = (255, 255, 255)
+    bg_color: COLORU8 | None = None
+    line_type: OCVLineType = cv2.LINE_AA
+
+
+# Set up default values. Note, users can import and modify these to affect global usage
+TXTDEFAULTS = _DefaultText()
+TXTSIZE = _TextSizeSettings()
+
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Data types
 
 
-class TextSize(NamedTuple):
+class TextDimensions(NamedTuple):
     h: int
     w: int
     base: int
@@ -41,12 +78,12 @@ class TextDrawer:
 
     def __init__(
         self,
-        scale: float = 0.5,
-        thickness: int = 1,
-        color: COLORU8 = (255, 255, 255),
-        bg_color: COLORU8 | None = None,
-        font: OCVFont = cv2.FONT_HERSHEY_SIMPLEX,
-        line_type: OCVLineType = cv2.LINE_AA,
+        scale: float = TXTSIZE.medium,
+        thickness: int = TXTDEFAULTS.thickness,
+        color: COLORU8 = TXTDEFAULTS.color,
+        bg_color: COLORU8 | None = TXTDEFAULTS.bg_color,
+        font: OCVFont = TXTDEFAULTS.font,
+        line_type: OCVLineType = TXTDEFAULTS.line_type,
         max_width: float | None = None,
         max_height: float | None = None,
     ):
@@ -60,6 +97,19 @@ class TextDrawer:
             scale=scale,
             line_type=line_type,
         )
+
+        # Pre-compute offset needed to deal with centering bug (?) in opencv-v5
+        # -> Seems text height incorrectly includes 'baseline' even when text has no dropping characters
+        self._v5_height_error = 0
+        if IS_OCV_V5:
+            size_cfg = {
+                "fontFace": self.style.font,
+                "fontScale": self.style.scale,
+                "thickness": self.style.fg_thickness,
+            }
+            (_, h_no_drop), b_no_drop = cv2.getTextSize("ALLCAPS", **size_cfg)
+            (_, h_dropped), b_dropped = cv2.getTextSize("abcdefgjpqy", **size_cfg)
+            self._v5_height_error = max(0, b_dropped - b_no_drop)
 
         # Enforce sizing limits if needed
         if (max_height is not None) or (max_width is not None):
@@ -237,7 +287,7 @@ class TextDrawer:
         text: str,
         scale: float | None = None,
         thickness: int | None = None,
-    ) -> TextSize:
+    ) -> TextDimensions:
         """
         Helper used to check how big a piece of text will be when drawn
         Returns:
@@ -251,9 +301,13 @@ class TextDrawer:
         if thickness is None:
             thickness = self.style.fg_thickness
 
-        (txt_w, txt_h), txt_base = cv2.getTextSize(text, self.style.font, scale, thickness)
+        (txt_w, txt_h), txt_base = cv2.getTextSize(text, fontFace=self.style.font, fontScale=scale, thickness=thickness)
 
-        return TextSize(txt_h, txt_w, txt_base)
+        # Fix odd height/baseline bug introduced with opencv-v5
+        if IS_OCV_V5:
+            txt_h = txt_h - self._v5_height_error
+
+        return TextDimensions(txt_h, txt_w, txt_base)
 
     # .................................................................................................................
 
@@ -322,12 +376,17 @@ def find_minimum_text_height(text_drawer: TextDrawer, example_text=None, padding
 if __name__ == "__main__":
 
     txt1 = TextDrawer()
-    txt2 = TextDrawer(2, 2, color=(0, 0, 255))
+    txt2 = TextDrawer(scale=2, thickness=2, color=(0, 0, 255))
 
-    image = np.zeros((480, 640, 3), dtype=np.uint8)
+    # Set up base image with centering ruler lines
+    img_h, img_w = 480, 640
+    image = np.zeros((img_h, img_w, 3), dtype=np.uint8)
+    image = cv2.line(image, (-5, img_h // 2), (img_w + 5, img_h // 2), (0, 255, 0))
+    image = cv2.line(image, (img_w // 2, -5), (img_w // 2, img_h + 5), (0, 255, 0))
+
     image = txt2.xy_norm(image, "X=0.25", (0.25, 0.1), color=(0, 255, 255))
     image = txt2.xy_norm(image, "AncX=0.75", (0.75, 0.9), color=(255, 255, 0))
-    image = txt2.xy_centered(image, "**CENTERED**", color=(0, 255, 255))
+    image = txt2.xy_centered(image, "<q<CENTERED>p>", color=(0, 255, 255))
     image = txt1.xy_norm(image, "LEFT-ANCHORED", (0.5, 0.25), (0, 0.5))
     image = txt1.xy_norm(image, "RIGHT-ANCHORED", (0.5, 0.75), (1, 0.5))
 

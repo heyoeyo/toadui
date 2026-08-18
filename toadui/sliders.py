@@ -11,7 +11,7 @@ import numpy as np
 from toadui.base import CachedBgFgElement
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color, lerp_colors
-from toadui.helpers.text import TextDrawer
+from toadui.helpers.text import TextDrawer, TXTSIZE
 from toadui.helpers.images import blank_image
 from toadui.helpers.drawing import draw_box_outline
 
@@ -19,7 +19,6 @@ from toadui.helpers.drawing import draw_box_outline
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType
 from typing import Iterable
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
@@ -41,7 +40,7 @@ class Slider(CachedBgFgElement):
         step: float = 0.05,
         color: COLORU8 | int = (40, 40, 40),
         indicator_width: int = 1,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         marker_step: float | None = None,
         marker_origin: float | None = None,
         typecast=None,
@@ -252,7 +251,7 @@ class MultiSlider(CachedBgFgElement):
         step: float = 0.05,
         color: COLORU8 | int = (40, 40, 40),
         indicator_width: int = 1,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         marker_step: float | None = None,
         marker_origin: float | None = None,
         typecast=None,
@@ -525,7 +524,7 @@ class ColorSlider(Slider):
         initial_position_norm: float = 0.5,
         num_steps: int | None = 256,
         indicator_width: int = 1,
-        text_scale: float = 0.5,
+        text_scale: float = TXTSIZE.medium,
         height: int = 40,
         minimum_width: int = 64,
         interpolation=cv2.INTER_LINEAR,

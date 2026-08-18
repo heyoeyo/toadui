@@ -1,3 +1,14 @@
+# Special check to force x11 use on linux, since opencv doesn't have wayland support
+# -> Without this, user is spammed with: qt.qpa.plugin: Could not find the Qt platform plugin "wayland"
+import sys
+import os
+
+if sys.platform.startswith("linux"):
+    is_wayland_platform = any(key in os.environ for key in ["DISPLAY", "WAYLAND_DISPLAY"])
+    if is_wayland_platform:
+        os.environ["QT_QPA_PLATFORM"] = "xcb"
+    pass
+
 from toadui.window import DisplayWindow, KEY
 from toadui.video import (
     LoopingVideoReader,
