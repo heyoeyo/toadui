@@ -19,7 +19,6 @@ from numpy import ndarray
 from toadui.helpers.types import SelfType, EmptyCallback
 from toadui.helpers.ocv_types import OCVCallback, HasOCVCallback
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Types
 
@@ -271,7 +270,7 @@ class DisplayWindow:
                 cb()
         return self
 
-    def show(self, image: ndarray, frame_delay_ms: float | None = None) -> [bool, int]:
+    def show(self, image: ndarray, frame_delay_ms: float | None = None) -> tuple[bool, int]:
         """
         Function which combines both opencv functions: 'imshow' and 'waitKey'
         This is meant as a convenience function in cases where only a single window is being displayed.
@@ -291,8 +290,17 @@ class DisplayWindow:
         curr_time_sec = perf_counter()
         self.dt, self._last_display_sec = curr_time_sec - self._last_display_sec, curr_time_sec
 
+        # Process any custom keybinds
         self.run_keypress_callbacks(keypress)
-        request_close = keypress in self.WINDOW_CLOSE_KEYS_SET
+
+        # Check if the window has been closed manually. If so, we need to request that the
+        # caller closes the display loop (otherwise they'll re-open the window)
+        is_window_closed = True
+        try:
+            is_window_closed = cv2.getWindowProperty(self.title, cv2.WND_PROP_VISIBLE) != 1.0
+        except cv2.error:
+            pass
+        request_close = (keypress in self.WINDOW_CLOSE_KEYS_SET) or is_window_closed
 
         return request_close, keypress
 
@@ -305,7 +313,7 @@ class DisplayWindow:
         return self
 
     @classmethod
-    def waitKey(cls, frame_delay_ms: float = 1) -> [bool, int]:
+    def waitKey(cls, frame_delay_ms: float = 1) -> tuple[bool, int]:
         """
         Wrapper around opencv waitkey (triggers draw to screen)
         Returns:

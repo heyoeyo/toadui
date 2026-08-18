@@ -12,7 +12,6 @@ import numpy as np
 from typing import Any
 from numpy import ndarray
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Classes
 
@@ -200,7 +199,11 @@ class WindowContextManager:
     def __exit__(self, exception_type, exception_value, exception_traceback):
 
         # Make sure we close the original window caller and run any other clean-up functions
-        cv2.destroyWindow(self._window_title)
+        try:
+            cv2.destroyWindow(self._window_title)
+        except cv2.error:
+            # This happens if the window was already closed
+            pass
         for func in self._cleanup_funcs:
             func()
 

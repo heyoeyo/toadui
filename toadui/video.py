@@ -19,12 +19,10 @@ from toadui.helpers.icons import draw_play_pause_icons
 from toadui.helpers.styling import UIStyle
 from toadui.helpers.colors import interpret_coloru8, pick_contrasting_gray_color, lerp_colors
 from toadui.patterns.truchet import draw_truchet, make_dot_tiles
-from toadui.cli import ask_for_path_if_missing
 
 # For type hints
 from numpy import ndarray
 from toadui.helpers.types import COLORU8, SelfType
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Protocols
@@ -121,7 +119,7 @@ class LoopingVideoReader(PauseableVideoReader):
 
     # .................................................................................................................
 
-    def read(self) -> [bool, int, ndarray]:
+    def read(self) -> tuple[bool, int, ndarray]:
         """
         Read the next available frame
         Returns:
@@ -244,7 +242,7 @@ class LoopingVideoReader(PauseableVideoReader):
         self.open()
         return self
 
-    def __next__(self) -> [bool, int, ndarray]:
+    def __next__(self) -> tuple[bool, int, ndarray]:
         """
         Iterator that provides frame data from a video capture object.
         Returns:
@@ -327,7 +325,7 @@ class ImageAsVideoReader(PauseableVideoReader):
         self._is_paused = (not self._is_paused) if new_pause_state is None else new_pause_state
         return self._is_paused
 
-    def read(self) -> [bool, int, ndarray]:
+    def read(self) -> tuple[bool, int, ndarray]:
         """
         Read 'new frame' from video. Though this will always
         be the same repeating image for the image video reader!
@@ -407,7 +405,7 @@ class ImageAsVideoReader(PauseableVideoReader):
 
     # .................................................................................................................
 
-    def __next__(self) -> [bool, int, ndarray]:
+    def __next__(self) -> tuple[bool, int, ndarray]:
         """
         Iterator that provides frame data for loops (as if reading frames from a video)
         Returns:
@@ -457,7 +455,7 @@ class ReversibleLoopingVideoReader(LoopingVideoReader):
 
     # .................................................................................................................
 
-    def read(self) -> [bool, int, ndarray]:
+    def read(self) -> tuple[bool, int, ndarray]:
         """
         Read the next available frame
         Returns:
