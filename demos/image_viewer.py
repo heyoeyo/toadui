@@ -23,7 +23,6 @@ from toadui.carousels import PathCarousel
 from toadui.helpers.icons import draw_rotating_arrow_icons
 from toadui.helpers.pathing import save_path_counter, modify_file_path, simplify_path
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
 
@@ -112,7 +111,7 @@ l_rotarrow, r_rotarrow = draw_rotating_arrow_icons(color_bg=(40, 40, 40), scale_
 rot_left_btn = ImmediateImageButton(l_rotarrow)
 rot_right_btn = ImmediateImageButton(r_rotarrow)
 save_btn = ImmediateButton("  Save  ", (40, 10, 160))
-nearest_interp_btn = ToggleButton("Use nearest interpolation")
+hidden_nearest_interp_btn = ToggleButton("Use nearest interpolation")
 
 # Build full UI
 show_file_select = len(file_selector) > 1
@@ -130,6 +129,7 @@ ui_layout = VStack(
             HStack(rot_left_btn, rot_right_btn),
             save_btn if enable_save else None,
         ),
+        min_w=800,
         flex=(1, 0),
     ),
     file_selector if show_file_select else None,
@@ -148,7 +148,7 @@ window.attach_keypress_callbacks(
         "Cycle images": {KEY.L_ARROW: file_selector.prev, KEY.R_ARROW: file_selector.next},
         "Rotate image": {KEY.U_ARROW: rot_left_btn.click, KEY.D_ARROW: rot_right_btn.click},
         "Adjust image scaling": {"[": imgsize_slider.decrement, "]": imgsize_slider.increment},
-        "Toggle scaling interpolation": {"i": nearest_interp_btn.toggle},
+        "Toggle scaling interpolation": {"i": hidden_nearest_interp_btn.toggle},
         "Save image": {"s": save_btn.click} if enable_save else None,
     }
 ).report_keypress_descriptions()
@@ -185,11 +185,11 @@ with window.auto_close():
             # Force reset or re-read of controls
             num_rots = 0
             imgsize_slider.set_is_changed()
-            nearest_interp_btn.set_is_changed()
+            hidden_nearest_interp_btn.set_is_changed()
 
         # Read controls
         is_imgsize_changed, img_size_pct = imgsize_slider.read()
-        is_imginterp_changed, use_nearest_interp = nearest_interp_btn.read()
+        is_imginterp_changed, use_nearest_interp = hidden_nearest_interp_btn.read()
         is_rotleft = rot_left_btn.read()
         is_rotright = rot_right_btn.read()
         is_save_clicked = save_btn.read()

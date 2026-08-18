@@ -13,7 +13,7 @@ import numpy as np
 from toadui.cli import ask_for_media_path
 from toadui.video import VideoPlaybackSlider, load_looping_video_or_image, read_webcam_string
 from toadui.window import DisplayWindow, KEY
-from toadui.buttons import ToggleButton, ImmediateButton, RadioBar
+from toadui.buttons import ToggleButton, ImmediateButton, RadioBar, RadioConstraint
 from toadui.sliders import MultiSlider
 from toadui.images import DynamicImage
 from toadui.plots import SimpleHistogramPlot
@@ -21,7 +21,6 @@ from toadui.layout import VStack, HStack, GridStack, Swapper
 from toadui.colormaps import apply_colormap, make_colormap_from_keypoints
 from toadui.helpers.images import histogram_equalization
 from toadui.helpers.pathing import modify_file_path, simplify_path
-
 
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
@@ -209,9 +208,11 @@ ch3_swap = Swapper(ch3_img_elem, ch3_histo_plot, keys=ch_swap_keys)
 
 # Create color space selector & mode toggle buttons
 cspace_radio = RadioBar(*valid_cspaces, label_padding=2).set_label(initial_cspace)
+show_full_video_btn = ToggleButton("Full Video", color_on=(110, 80, 90))
 show_channels_btn = ToggleButton("Show Channels", color_on=(110, 110, 70), default_state=True)
 show_histos_btn = ToggleButton("Show Histograms", color_on=(110, 60, 110))
 disable_adjustments_btn = ToggleButton("Disable Adjustments", color_on=(90, 110, 110))
+grid_radio = RadioConstraint(show_channels_btn, show_histos_btn, initial_active_index=1)
 
 # Create thresholding sliders for each channel + histo-equalize toggle
 ch1_thresh = MultiSlider("Channel 1 Thresholds", (0, 1), 0, 1, 0.01, marker_step=0.25, fill_color=(40, 50, 70))
@@ -230,7 +231,7 @@ img_grid = GridStack(bgr_img_elem, ch1_swap, ch2_swap, ch3_swap, num_rows=num_gr
 img_swap_elem = Swapper(
     img_grid,
     bgr_img_elem,
-    keys=("grid", "frame-only"),
+    keys=("grid", "full-video"),
 )
 
 # Build final layout
@@ -239,7 +240,7 @@ ui_layout = VStack(
     cspace_radio,
     img_swap_elem,
     playback_slider if not (is_webcam_source or is_image_source) else None,
-    HStack(show_channels_btn, show_histos_btn, disable_adjustments_btn),
+    HStack(show_full_video_btn, show_channels_btn, show_histos_btn, disable_adjustments_btn, min_w=800),
     HStack(ch1_thresh, heq1_btn, flex=slider_flex),
     HStack(ch2_thresh, heq2_btn, flex=slider_flex),
     HStack(ch3_thresh, heq3_btn, flex=slider_flex),
@@ -261,9 +262,9 @@ window.attach_keypress_callbacks(
         "Toggle playback": {" ": vreader.toggle_pause} if not is_image_source else None,
         "Switch colorspaces": {KEY.L_ARROW: cspace_radio.prev, KEY.R_ARROW: cspace_radio.next},
         "Adjust grid layout": {",": img_grid.increment_num_rows, ".": img_grid.decrement_num_rows},
-        "Toggle channel view": {"c": show_channels_btn.toggle},
-        "Toggle original": {"d": disable_adjustments_btn.toggle},
-        "Toggle histograms": {"h": show_histos_btn.toggle},
+        "Toggle channels vs. histograms": {"TAB": grid_radio.next},
+        "Toggle full view": {"f": show_full_video_btn.toggle},
+        "Toggle adjustments": {"d": disable_adjustments_btn.toggle},
         "Toggle equalization": {"1": heq1_btn.toggle, "2": heq2_btn.toggle, "3": heq3_btn.toggle},
         "Toggle histogram log scale": {
             "l": (ch1_histo_plot.toggle_log_scale, ch2_histo_plot.toggle_log_scale, ch3_histo_plot.toggle_log_scale)
@@ -275,6 +276,7 @@ window.attach_keypress_callbacks(
     }
 )
 window.report_keypress_descriptions()
+print("- Reset sliders with right-click")
 
 # Make sure initial colorspace is selected
 splitter_select = cspace_splitters_and_titles_lut[initial_cspace]
@@ -291,24 +293,23 @@ with window.auto_close(vreader.release):
         _, (ch1_low_thresh, ch1_high_thresh) = ch1_thresh.read()
         _, (ch2_low_thresh, ch2_high_thresh) = ch2_thresh.read()
         _, (ch3_low_thresh, ch3_high_thresh) = ch3_thresh.read()
-        is_show_channels_changed, show_channels = show_channels_btn.read()
-        is_show_histograms_changed, show_histograms = show_histos_btn.read()
+        is_gridview_changed, _, active_grid_btn = grid_radio.read()
+        is_full_video_changed, show_full_video = show_full_video_btn.read()
         _, disable_adjustments = disable_adjustments_btn.read()
 
-        # Swap between full image & grid view
-        if is_show_channels_changed:
-            img_swap_elem.set_swap_key("grid" if show_channels else "frame-only")
+        # Handle full vs grid view
+        if is_full_video_changed:
+            img_swap_elem.set_swap_key("full-video" if show_full_video else "grid")
 
         # Swap between displaying channel images & histogram plots
-        if is_show_histograms_changed:
-            ch_swap_key = "histogram" if show_histograms else "channel"
+        if is_gridview_changed:
+            ch_swap_key = "histogram" if (active_grid_btn is show_histos_btn) else "channel"
             ch1_swap.set_swap_key(ch_swap_key)
             ch2_swap.set_swap_key(ch_swap_key)
             ch3_swap.set_swap_key(ch_swap_key)
 
-            # Automatically show channels if user toggles histograms on
-            if show_histograms:
-                show_channels_btn.toggle(True)
+            # Force grid view whenever settings change
+            show_full_video_btn.toggle(False)
 
         # Switch color splitter instance
         if is_cspace_changed:
@@ -330,8 +331,8 @@ with window.auto_close(vreader.release):
         bgr_img_elem.set_image(bgr_frame)
 
         # Only do work to update histogram or false-color channel images, depending on which is showing
-        if show_channels:
-            if show_histograms:
+        if not show_full_video:
+            if active_grid_btn is show_histos_btn:
                 ch1_histo_plot.set_data(ch1_frame)
                 ch2_histo_plot.set_data(ch2_frame)
                 ch3_histo_plot.set_data(ch3_frame)

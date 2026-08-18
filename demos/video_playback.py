@@ -15,7 +15,6 @@ from toadui.text import PrefixedTextBlock
 from toadui.layout import VStack, HStack
 from toadui.helpers.drawing import draw_circle_norm
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
 
@@ -52,7 +51,7 @@ xypx_block = PrefixedTextBlock("Mouse XY: ", suffix=" px", max_characters=16)
 # Stack elements together to form layout for display
 show_playback_bar = not is_webcam_source
 ui_layout = VStack(
-    HStack(xynorm_block, xypx_block, min_w=600),
+    HStack(xynorm_block, xypx_block, min_w=800),
     img_elem,
     playback_slider if show_playback_bar else None,
 )

@@ -24,7 +24,6 @@ from toadui.helpers.images import dirty_blur, kuwahara_filter
 from toadui.helpers.sizing import get_image_hw_for_max_side_length, resize_hw
 from toadui.helpers.pathing import modify_file_path, simplify_path
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
 
@@ -160,7 +159,7 @@ swap_filter_ctrls_ui = Swapper(
 show_playback_bar = not (is_webcam_source or is_image_source)
 ui_layout = VStack(
     filter_select,
-    HStack(img_size_slider, time_txt, flex=(1, 0)) if show_imgsize_slider else None,
+    HStack(img_size_slider, time_txt, min_w=800, flex=(1, 0)) if show_imgsize_slider else None,
     img_elem,
     playback_slider if show_playback_bar else None,
     swap_filter_ctrls_ui,

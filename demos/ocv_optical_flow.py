@@ -28,7 +28,6 @@ from toadui.helpers.data_management import MaxLengthKVStorage
 # For type hints
 from numpy import ndarray
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
 
@@ -165,7 +164,7 @@ show_playback_bar = not is_webcam_source
 
 # Build complete layout
 ui_layout = VStack(
-    HStack(image_size_slider, time_text_block, flex=(1, 0)),
+    HStack(image_size_slider, time_text_block, min_w=800, flex=(1, 0)),
     main_display_block,
     playback_ctrl if show_playback_bar else None,
     color_scale_slider,

@@ -22,7 +22,6 @@ from toadui.helpers.images import CropData
 from toadui.helpers.icons import draw_lock_icons
 from toadui.helpers.pathing import modify_file_path, simplify_path, make_webcam_path
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
 
@@ -70,7 +69,7 @@ block_sample_text = " (1234, 1234) "
 xy1_text_block = PrefixedTextBlock("Crop XY1: ", max_characters=block_sample_text)
 xy2_text_block = PrefixedTextBlock("Crop XY2: ", max_characters=block_sample_text)
 hw_text_block = PrefixedTextBlock("Crop HW: ", max_characters=block_sample_text)
-stack_text_blocks = HStack(xy1_text_block, xy2_text_block, hw_text_block)
+stack_text_blocks = HStack(xy1_text_block, xy2_text_block, hw_text_block, min_w=640)
 zoom_slider = Slider("Zoom", 0.75, min_val=0, max_val=1, step=0.05, marker_step=0.25, enable_value_display=False)
 save_btn = ImmediateButton("Save", color=(125, 185, 0), text_color=(255, 255, 255), text_scale=0.75)
 
@@ -141,7 +140,7 @@ window.attach_keypress_callbacks(
             {",": vreader.prev_frame, ".": vreader.next_frame} if is_video_source else None
         ),
         "Change layout": {KEY.TAB: ui_layout.next},
-        "Toggle zoom lock": {"z": lock_btn.toggle},
+        "Toggle zoom lock": {"z": lock_btn.toggle, "l": lock_btn.toggle},
         "Nudge crop region": {
             KEY.L_ARROW: lambda: box_olay.nudge(left=1),
             KEY.R_ARROW: lambda: box_olay.nudge(right=1),

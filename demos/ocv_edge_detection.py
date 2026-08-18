@@ -26,7 +26,6 @@ from toadui.helpers.text import TextDrawer
 from toadui.helpers.sampling import cosine_interp
 from toadui.helpers.pathing import modify_file_path, simplify_path
 
-
 # ---------------------------------------------------------------------------------------------------------------------
 # %% Set up script args
 
@@ -91,7 +90,7 @@ sample_frame = vreader.get_sample_frame()
 img_h, img_w = sample_frame.shape[0:2]
 
 # Figure out image size bounds
-largest_size = max(img_h, img_w)
+largest_size = max(img_h, img_w, init_operating_size)
 smallest_size = max(1, min(largest_size // 2, 50))
 initial_size = min(init_operating_size, largest_size)
 show_imgsize_slider = largest_size > 50
@@ -180,7 +179,7 @@ swap_filter_ctrls_ui = Swapper(
 show_playback_bar = not (is_webcam_source or is_image_source)
 ui_layout = VStack(
     filter_select,
-    HStack(img_size_slider, preblur_slider, time_txt, flex=(1, 1, 0), min_w=600),
+    HStack(img_size_slider, preblur_slider, time_txt, flex=(1, 1, 0), min_w=800),
     img_elem,
     playback_slider if show_playback_bar else None,
     HStack(show_orig_btn, invert_btn, overlay_btn),
